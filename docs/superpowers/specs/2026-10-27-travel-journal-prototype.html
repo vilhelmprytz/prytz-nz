@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trip prototype: three styles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--body-font); -webkit-font-smoothing: antialiased;
+    transition: background .3s, color .3s;
+  }
+
+  /* ---------- themes ---------- */
+  body.t-journal {
+    --bg: #f3ede2; --panel: #efe7d8; --ink: #2b241d; --muted: #8a7c6a; --line: #ddd2bf;
+    --accent: #c2502e; --title-font: 'Fraunces', serif; --body-font: 'Inter', system-ui, sans-serif;
+    --title-size: 40px; --title-weight: 600; --title-style: normal;
+  }
+  body.t-dark {
+    --bg: #0d0e10; --panel: #15171a; --ink: #f1f0ec; --muted: #8b8d93; --line: #24262b;
+    --accent: #ffc94a; --title-font: 'Space Grotesk', sans-serif; --body-font: 'Inter', system-ui, sans-serif;
+    --title-size: 52px; --title-weight: 700; --title-style: normal;
+  }
+  body.t-postcard {
+    --bg: #fbfaf7; --panel: #ffffff; --ink: #14161c; --muted: #6f7380; --line: #e6e4de;
+    --accent: #2147d6; --title-font: 'Instrument Serif', serif; --body-font: 'DM Sans', system-ui, sans-serif;
+    --title-size: 60px; --title-weight: 400; --title-style: italic;
+  }
+
+  /* ---------- layout: feed 2/3, map 1/3 ---------- */
+  .app { display: grid; grid-template-columns: 2fr 1fr; height: 100vh; transition: grid-template-columns .35s ease; }
+  body.map-hidden .app { grid-template-columns: 1fr 0fr; }
+  .feed { overflow-y: auto; scroll-behavior: smooth; }
+  .feed-inner { max-width: 980px; margin: 0 auto; padding: 36px 48px 140px; }
+  .mapwrap { position: relative; overflow: hidden; border-left: 1px solid var(--line); background: var(--panel); }
+  #map { position: absolute; inset: 0; }
+
+  /* ---------- header ---------- */
+  .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 40px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .brand { font-family: var(--title-font); font-size: 26px; font-weight: var(--title-weight); font-style: var(--title-style); letter-spacing: -.01em; }
+  .brand small { display: block; font-family: var(--body-font); font-style: normal; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+  .maptoggle {
+    font: 500 13px var(--body-font); color: var(--ink); background: transparent;
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  }
+  .maptoggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- posts ---------- */
+  .post { display: grid; grid-template-areas: "meta" "title" "hero" "desc" "gallery"; margin-bottom: 84px; scroll-margin-top: 24px; }
+  .meta { grid-area: meta; display: flex; gap: 10px; align-items: center; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .meta .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: background .2s; }
+  .post.active .meta .dot { background: var(--accent); }
+  .title { grid-area: title; font-family: var(--title-font); font-size: var(--title-size); font-weight: var(--title-weight); font-style: var(--title-style); line-height: 1.02; letter-spacing: -.02em; margin: 0 0 20px; }
+  .hero { grid-area: hero; margin: 0; cursor: zoom-in; overflow: hidden; }
+  .hero img { display: block; width: 100%; aspect-ratio: 3/2; object-fit: cover; transition: transform .6s ease; }
+  .hero:hover img { transform: scale(1.015); }
+  .desc { grid-area: desc; font-size: 16px; line-height: 1.65; max-width: 62ch; margin: 22px 0 18px; }
+  .gallery { grid-area: gallery; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .gallery button { all: unset; cursor: zoom-in; position: relative; aspect-ratio: 1; overflow: hidden; }
+  .gallery img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .2s; }
+  .gallery button:hover img { opacity: .85; }
+  .gallery .more span { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.5); color: #fff; font-weight: 600; font-size: 15px; }
+
+  /* journal: printed-photo look */
+  .t-journal .hero { background: #fff; padding: 12px 12px 40px; box-shadow: 0 1px 2px rgba(60,40,20,.08), 0 10px 30px -12px rgba(60,40,20,.35); transform: rotate(-.4deg); }
+  .t-journal .post:nth-child(even) .hero { transform: rotate(.35deg); }
+  .t-journal .gallery button { background: #fff; padding: 5px; box-shadow: 0 4px 12px -6px rgba(60,40,20,.4); }
+  .t-journal .meta { color: var(--accent); }
+
+  /* darkroom: title laid over the photo */
+  .t-dark .feed-inner { max-width: 1100px; padding: 28px 28px 140px; }
+  .t-dark .post { grid-template-areas: "hero" "desc" "gallery"; }
+  .t-dark .meta, .t-dark .title { grid-area: hero; z-index: 2; pointer-events: none; padding: 0 28px; color: #fff; }
+  .t-dark .meta { align-self: end; margin-bottom: 92px; color: rgba(255,255,255,.75); }
+  .t-dark .title { align-self: end; margin: 0 0 26px; text-shadow: 0 2px 20px rgba(0,0,0,.4); }
+  .t-dark .hero { border-radius: 14px; position: relative; }
+  .t-dark .hero::after { content: ""; position: absolute; inset: 40% 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.75)); pointer-events: none; }
+  .t-dark .gallery button { border-radius: 8px; }
+  .t-dark .desc { color: #c9c9c6; }
+
+  /* postcard: airy editorial */
+  .t-postcard .feed-inner { max-width: 1000px; }
+  .t-postcard .hero { border-radius: 4px; }
+  .t-postcard .meta { color: var(--ink); }
+  .t-postcard .meta .place { color: var(--accent); }
+  .t-postcard .gallery { gap: 12px; }
+  .t-postcard .gallery button { border-radius: 4px; }
+  .t-postcard .title { margin-bottom: 24px; }
+
+  /* ---------- map bits ---------- */
+  .pin { width: 14px; height: 14px; border-radius: 50%; background: var(--bg); border: 3px solid var(--accent); transition: transform .2s, background .2s; }
+  .pin.active { background: var(--accent); transform: scale(1.5); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .t-postcard .pin { background: #fff; border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+  .t-postcard .pin.active { background: var(--accent); }
+  .leaflet-tooltip.lbl { font: 600 12px var(--body-font); background: var(--panel); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0,0,0,.15); border-radius: 6px; padding: 4px 8px; }
+  .leaflet-tooltip.lbl::before { display: none; }
+  .maphead { position: absolute; z-index: 500; top: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; pointer-events: none; }
+  .maphead button { pointer-events: auto; font: 500 12px var(--body-font); background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  .showmap { position: fixed; right: 20px; top: 20px; z-index: 600; display: none; font: 500 13px var(--body-font); background: var(--ink); color: var(--bg); border: 0; border-radius: 999px; padding: 9px 16px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  body.map-hidden .showmap { display: block; }
+  body.map-hidden .maptoggle { visibility: hidden; }
+
+  /* ---------- lightbox ---------- */
+  .lb { position: fixed; inset: 0; z-index: 1000; background: rgba(8,8,10,.94); display: none; align-items: center; justify-content: center; }
+  .lb.open { display: flex; }
+  .lb img { max-width: 92vw; max-height: 86vh; object-fit: contain; }
+  .lb .cap { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; color: #ddd; font: 500 13px 'Inter', sans-serif; }
+  .lb .nav { position: absolute; top: 50%; transform: translateY(-50%); background: none; border: 0; color: #fff; font-size: 40px; cursor: pointer; padding: 20px; opacity: .7; }
+  .lb .nav:hover { opacity: 1; }
+  .lb .prev { left: 10px; } .lb .next { right: 10px; }
+
+  /* ---------- style switcher (mockup only) ---------- */
+  .switch { position: fixed; z-index: 900; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; outline: 2px solid #ffc94a; gap: 4px; padding: 5px; background: rgba(20,20,22,.92); border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-family: 'Inter', sans-serif; }
+  .switch .lab { color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; padding: 9px 10px 9px 14px; }
+  .switch button { border: 0; background: transparent; color: #ddd; font: 500 13px 'Inter', sans-serif; padding: 9px 16px; border-radius: 999px; cursor: pointer; }
+  .switch button.on { background: #fff; color: #111; }
+
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: 38vh 1fr; }
+    .mapwrap { grid-row: 1; border-left: 0; border-bottom: 1px solid var(--line); }
+    .feed-inner { padding: 24px 18px 140px; }
+    body.map-hidden .app { grid-template-rows: 0 1fr; grid-template-columns: 1fr; }
+    .gallery { grid-template-columns: repeat(3, 1fr); }
+  }
+  .switch { display: none !important; }
+</style>
+</head>
+<body class="t-postcard">
+
+<div class="app">
+  <main class="feed" id="feed">
+    <div class="feed-inner">
+      <header class="top">
+        <div class="brand">Vilhelm's trip<small>Around the globe · 2026</small></div>
+        <button class="maptoggle" onclick="setMap(false)">Hide map</button>
+      </header>
+      <div id="posts"></div>
+    </div>
+  </main>
+  <aside class="mapwrap">
+    <div id="map"></div>
+    <div class="maphead">
+      <button onclick="fitAll()">Whole trip</button>
+      <button onclick="setMap(false)">Hide ✕</button>
+    </div>
+  </aside>
+</div>
+
+<button class="showmap" onclick="setMap(true)">Show map</button>
+
+<div class="lb" id="lb" onclick="if(event.target===this)closeLb()">
+  <button class="nav prev" onclick="stepLb(-1)">‹</button>
+  <img id="lbimg" alt="">
+  <button class="nav next" onclick="stepLb(1)">›</button>
+  <div class="cap" id="lbcap"></div>
+</div>
+
+<div class="switch">
+  <span class="lab">Style</span>
+  <button data-choice="journal" onclick="setTheme('journal', this)">A · Journal</button>
+  <button data-choice="darkroom" onclick="setTheme('dark', this)">B · Darkroom</button>
+  <button data-choice="postcard" class="on" onclick="setTheme('postcard', this)">C · Postcard</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Newest first, as in the feed. Photos are stock placeholders.
+const POSTS = [
+  { id: 'sf', date: 'Fri 24 Oct', place: 'San Francisco, CA', title: 'Museum X', ll: [37.7716, -122.4686], extra: 12,
+    desc: 'Spent the whole afternoon in here and still didn’t see half of it. The top floor has a view straight out over the park and the fog rolling in, which was honestly as good as anything on the walls.' },
+  { id: 'bigsur', date: 'Wed 22 Oct', place: 'Big Sur, CA', title: 'Highway 1', ll: [36.2704, -121.8081], extra: 6,
+    desc: 'Drove the coast road south to north. Stopped every ten minutes because every bend was better than the last one.' },
+  { id: 'yosemite', date: 'Tue 21 Oct', place: 'Yosemite, CA', title: 'First real hike', ll: [37.7456, -119.5936], extra: 4,
+    desc: 'Up to Vernal Fall early before the crowds. Legs are not happy today.' },
+  { id: 'jtree', date: 'Sun 19 Oct', place: 'Joshua Tree, CA', title: 'Desert stars', ll: [33.8734, -115.9010], extra: 3,
+    desc: 'No signal, no lights, more stars than I have ever seen.' },
+  { id: 'la', date: 'Sat 18 Oct', place: 'Los Angeles, CA', title: 'Landed!', ll: [34.0522, -118.2437], extra: 0,
+    desc: '14 hours of flying later. Tacos, then sleep.' },
+];
+const img = (seed, w, h) => `https://picsum.photos/seed/${seed}/${w}/${h}`;
+POSTS.forEach(p => p.images = Array.from({ length: 1 + Math.min(p.extra, 4) + (p.extra > 4 ? 1 : 0) }, (_, i) => `${p.id}-${i}`));
+
+const postsEl = document.getElementById('posts');
+POSTS.forEach((p, idx) => {
+  const thumbs = p.images.slice(1, 6).map((s, i) => {
+    const isMore = i === 4 && p.extra > 4;
+    return `<button class="${isMore ? 'more' : ''}" onclick="openLb(${idx}, ${i + 1})"><img loading="lazy" src="${img(s, 400, 400)}" alt="">${isMore ? `<span>+${p.extra - 4}</span>` : ''}</button>`;
+  }).join('');
+  postsEl.insertAdjacentHTML('beforeend', `
+    <article class="post" id="post-${p.id}" data-idx="${idx}">
+      <div class="meta"><span class="dot"></span><span>${p.date}</span><span>·</span><span class="place">${p.place}</span></div>
+      <h2 class="title">${p.title}</h2>
+      <figure class="hero" onclick="openLb(${idx}, 0)"><img src="${img(p.images[0], 1500, 1000)}" alt=""></figure>
+      <p class="desc">${p.desc}</p>
+      ${thumbs ? `<div class="gallery">${thumbs}</div>` : ''}
+    </article>`);
+});
+
+// ---------- map ----------
+const TILES = {
+  journal: ['https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', '&copy; OpenStreetMap &copy; CARTO'],
+  dark: ['https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', '&copy; OpenStreetMap &copy; CARTO'],
+  postcard: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', 'Imagery &copy; Esri'],
+};
+const ROUTE_COLOR = { journal: '#c2502e', dark: '#ffc94a', postcard: '#ffffff' };
+const map = L.map('map', { zoomControl: false, attributionControl: true });
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+let tiles, route;
+const chrono = [...POSTS].reverse();
+const markers = {};
+POSTS.forEach(p => {
+  const m = L.marker(p.ll, { icon: L.divIcon({ className: '', html: `<div class="pin" id="pin-${p.id}"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] }) })
+    .addTo(map)
+    .bindTooltip(`${p.title} · ${p.date}`, { className: 'lbl', direction: 'right', offset: [12, 0] })
+    .on('click', () => document.getElementById('post-' + p.id).scrollIntoView({ behavior: 'smooth' }));
+  markers[p.id] = m;
+});
+function drawRoute(theme) {
+  if (route) route.remove();
+  route = L.polyline(chrono.map(p => p.ll), { color: ROUTE_COLOR[theme], weight: 3, dashArray: theme === 'postcard' ? null : '6 8', opacity: .9 }).addTo(map);
+  route.bringToBack();
+}
+function setTiles(theme) {
+  if (tiles) tiles.remove();
+  tiles = L.tileLayer(TILES[theme][0], { attribution: TILES[theme][1], maxZoom: 18 }).addTo(map);
+  drawRoute(theme);
+}
+function fitAll() { map.fitBounds(L.latLngBounds(POSTS.map(p => p.ll)), { padding: [50, 50] }); }
+setTiles('postcard'); fitAll();
+
+// ---------- feed <-> map ----------
+let activeId = null;
+function setActive(id) {
+  if (id === activeId) return;
+  activeId = id;
+  document.querySelectorAll('.post').forEach(el => el.classList.toggle('active', el.id === 'post-' + id));
+  document.querySelectorAll('.pin').forEach(el => el.classList.toggle('active', el.id === 'pin-' + id));
+  const p = POSTS.find(x => x.id === id);
+  markers[id].openTooltip();
+  if (!map.getBounds().pad(-0.15).contains(p.ll)) map.panTo(p.ll);
+}
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id.replace('post-', '')); });
+}, { root: document.getElementById('feed'), rootMargin: '-35% 0px -55% 0px' });
+document.querySelectorAll('.post').forEach(el => io.observe(el));
+setActive(POSTS[0].id);
+
+// ---------- map show/hide ----------
+function setMap(show) {
+  document.body.classList.toggle('map-hidden', !show);
+  setTimeout(() => map.invalidateSize(), 380);
+}
+
+// ---------- theme ----------
+function setTheme(t, btn) {
+  document.body.className = 't-' + t + (document.body.classList.contains('map-hidden') ? ' map-hidden' : '');
+  document.querySelectorAll('.switch button').forEach(b => b.classList.toggle('on', b === btn));
+  setTiles(t);
+}
+
+// ---------- lightbox ----------
+let lbPost = 0, lbIdx = 0;
+function openLb(pi, ii) { lbPost = pi; lbIdx = ii; showLb(); document.getElementById('lb').classList.add('open'); }
+function showLb() {
+  const p = POSTS[lbPost];
+  document.getElementById('lbimg').src = img(p.images[lbIdx], 1600, 1067);
+  document.getElementById('lbcap').textContent = `${p.title} · ${lbIdx + 1} / ${p.images.length}`;
+}
+function stepLb(d) { const n = POSTS[lbPost].images.length; lbIdx = (lbIdx + d + n) % n; showLb(); }
+function closeLb() { document.getElementById('lb').classList.remove('open'); }
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lb').classList.contains('open')) return;
+  if (e.key === 'Escape') closeLb();
+  if (e.key === 'ArrowRight') stepLb(1);
+  if (e.key === 'ArrowLeft') stepLb(-1);
+});
+</script>
+</body>
+</html>
