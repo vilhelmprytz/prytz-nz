@@ -1,1 +1,39 @@
+# brainstorming / plan workspaces
 .superpowers/
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# testing
+/coverage
+/test-results
+/playwright-report
+/e2e/.auth
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# local storage driver
+/.storage/
+/.storage-e2e/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+
+# env files
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

@@ -1,0 +1,15 @@
+# Local Postgres for development and e2e tests (databases: prytz, prytz_e2e).
+services:
+  db:
+    image: postgres:17-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: prytz
+    volumes:
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

@@ -1,0 +1,1 @@
+CREATE DATABASE prytz_e2e;
