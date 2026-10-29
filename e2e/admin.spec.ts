@@ -26,7 +26,15 @@ test("create, fill from EXIF, publish, appears as published", async ({ page }) =
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByRole("button", { name: "Unpublish" })).toBeVisible();
   await page.goto("/admin");
-  await expect(page.getByRole("listitem").filter({ hasText: "Queenstown" })).toContainText("Published");
+  const row = page.getByRole("listitem").filter({ hasText: "Queenstown" });
+  await expect(row).toContainText("Published");
+
+  // Clean up so the reader specs see only seeded posts; this also covers Delete.
+  await row.getByRole("link").click();
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page).toHaveURL("/admin");
+  await expect(page.getByRole("listitem").filter({ hasText: "Queenstown" })).toHaveCount(0);
 });
 
 test("no GPS prompts for location and publish lists errors", async ({ page }) => {

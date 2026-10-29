@@ -4,7 +4,6 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { E2E_ENV } from "./env";
-import { seed } from "./seed";
 
 export async function resetDatabase(url: string): Promise<void> {
   const client = postgres(url, { max: 1, onnotice: () => {} });
@@ -16,8 +15,8 @@ export async function resetDatabase(url: string): Promise<void> {
   }
 }
 
+/** Fresh database and storage for every run; content is seeded by e2e/seed.setup.ts after the empty-state test. */
 export default async function globalSetup() {
   await resetDatabase(E2E_ENV.DATABASE_URL);
   await rm(E2E_ENV.FS_STORAGE_DIR, { recursive: true, force: true });
-  await seed();
 }

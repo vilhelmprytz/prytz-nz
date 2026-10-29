@@ -24,3 +24,4 @@ export const E2E_ENV: Record<string, string> = {
 
 export const ADMIN_STATE = "e2e/.auth/admin.json";
 export const READER_STATE = "e2e/.auth/reader.json";
+export const SEED_FILE = "e2e/.auth/seed.json";

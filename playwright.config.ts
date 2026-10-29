@@ -9,8 +9,10 @@ export default defineConfig({
   fullyParallel: false,
   use: { ...devices["Desktop Chrome"], baseURL: E2E_BASE_URL },
   projects: [
-    { name: "setup", testMatch: /auth\.setup\.ts/ },
-    { name: "chromium", dependencies: ["setup"], testIgnore: /auth\.setup\.ts/ },
+    // Runs first, against the freshly reset (empty) database.
+    { name: "empty", testMatch: /empty\.spec\.ts/ },
+    { name: "setup", testMatch: /\.setup\.ts/, dependencies: ["empty"] },
+    { name: "chromium", dependencies: ["setup"], testIgnore: [/\.setup\.ts/, /empty\.spec\.ts/] },
   ],
   webServer: {
     // Production build, not `next dev`: dev HMR can reload-loop pages mid-test.
