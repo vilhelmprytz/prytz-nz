@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import { UploadFailedError, uploadWithRetry } from "./upload";
 
-const sleep = vi.fn(async (_ms: number) => {});
+const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
 
 beforeEach(() => {
   sleep.mockClear();
