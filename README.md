@@ -84,6 +84,10 @@ Point `prytz.nz` (an `A` record, plus `AAAA` if the server has IPv6) at the Dokp
 - **Visitor IP:** from your phone (on mobile data, not the server's network), enter a wrong password once. The application logs should show a line like `[unlock] ip=<your phone's public IP> key=...`. If it shows a Docker or Traefik address instead, everyone would share one rate-limit bucket: adjust `TRUSTED_PROXY_HOPS` (the number of proxies in front of the app that append to `X-Forwarded-For`; `1` for plain Dokploy/Traefik) and check again.
 - **Photo location on Android:** create a test post from your phone. If the Location section says `From photo GPS`, the phone keeps location data on upload. If it never does, the browser's photo picker is stripping it: use `Use my current location` while you're at the place, or drop a pin.
 
+## Map imagery
+
+The satellite map uses Esri's World Imagery tiles (keyless, with the required attribution), set in [`src/geo/tiles.ts`](src/geo/tiles.ts). Esri licenses them under its Master License Agreement; for a small private site this works today, but if Esri ever starts requiring a key, swap the URL in that file for another satellite provider with a free tier (for example MapTiler `satellite-v2`, which needs a free API key).
+
 ## Day-to-day
 
 - **Posting:** go to `https://prytz.nz/admin`, sign in with Google, tap **New post**, add photos. Date and location fill in from the photos; drafts autosave; **Publish** when ready. You can backfill older stops: posts are ordered by when the photos were taken.
