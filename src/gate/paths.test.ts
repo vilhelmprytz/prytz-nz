@@ -24,7 +24,11 @@ test.each([
   ["//evil.com", "/"],
   ["https://evil.com", "/"],
   ["/\\evil.com", "/"],
-])("safeNextPath(%s) → %s", (n, out) => {
+  ["/\t/evil.com", "/"],
+  ["/\n/evil.com", "/"],
+  ["/ /evil.com", "/"],
+  ["/%09/evil.com", "/%09/evil.com"],
+])("safeNextPath(%j) → %s", (n, out) => {
   expect(safeNextPath(n)).toBe(out);
 });
 

@@ -16,7 +16,10 @@ export function classifyPath(pathname: string): RouteClass {
 /** Only same-site relative paths; anything that could leave the site falls back to "/". */
 export function safeNextPath(next: string | null | undefined): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return "/";
-  return next;
+  // URL parsing drops tabs/newlines, so "/\t/evil.com" would become "//evil.com".
+  if (/[\u0000-\u0020\u007f]/.test(next)) return "/";
+  const resolved = new URL(next, "http://same.site");
+  return resolved.host === "same.site" ? next : "/";
 }
 
 /** Admin pages (everything under /admin except the login page) need an admin session before anything renders. */
