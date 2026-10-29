@@ -1,0 +1,247 @@
+.editor {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px 16px 120px;
+}
+
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 1100; /* above Leaflet's controls (1000) */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  background: var(--bg);
+}
+
+.back {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.saveState {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.section {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.addPhotos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  border: 1.5px dashed var(--line);
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.addPhotos:focus-within {
+  outline: 2px solid var(--accent);
+}
+
+.tray {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.tile,
+.tileHeadline {
+  position: relative;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--line);
+  border: 2px solid transparent;
+}
+
+.tileHeadline {
+  border-color: var(--accent);
+}
+
+.tileImage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.tileBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--panel);
+  font-size: 12px;
+  min-height: 36px;
+}
+
+.tileStage {
+  flex: 1;
+  color: var(--muted);
+}
+
+.tileError {
+  flex: 1;
+  color: #b42318;
+}
+
+.tileButton {
+  border: 0;
+  background: none;
+  padding: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.star,
+.starOn {
+  border: 0;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--line);
+}
+
+.starOn {
+  color: #e8a317;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.field input,
+.field textarea {
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 16px;
+  font-weight: 400;
+  resize: vertical;
+}
+
+.fieldLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.fieldLabel span + span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fdf3e1;
+  font-size: 14px;
+}
+
+.locationPicker {
+  display: grid;
+  gap: 10px;
+}
+
+.map {
+  height: 260px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #dfe8e3;
+}
+
+.pin {
+  background: var(--accent);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+
+.errors {
+  margin: 16px 0 0;
+  padding: 12px 12px 12px 28px;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.error {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 20px;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 0;
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+}
+
+.secondaryButton {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.dangerButton {
+  margin-left: auto;
+  border: 1px solid #f3c7c2;
+  background: none;
+  color: #b42318;
+}
