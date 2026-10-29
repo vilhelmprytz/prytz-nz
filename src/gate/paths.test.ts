@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { classifyPath, safeNextPath } from "./paths";
+import { classifyPath, isAdminPagePath, safeNextPath } from "./paths";
 
 test.each([
   ["/unlock", "public"],
@@ -26,4 +26,15 @@ test.each([
   ["/\\evil.com", "/"],
 ])("safeNextPath(%s) → %s", (n, out) => {
   expect(safeNextPath(n)).toBe(out);
+});
+
+test.each([
+  ["/admin", true],
+  ["/admin/posts/1", true],
+  ["/admin/login", false],
+  ["/admin/loginx", true],
+  ["/api/admin/uploads", false],
+  ["/administrator", false],
+])("isAdminPagePath(%s) → %s", (p, expected) => {
+  expect(isAdminPagePath(p)).toBe(expected);
 });

@@ -18,3 +18,8 @@ export function safeNextPath(next: string | null | undefined): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return "/";
   return next;
 }
+
+/** Admin pages (everything under /admin except the login page) need an admin session before anything renders. */
+export function isAdminPagePath(pathname: string): boolean {
+  return under(pathname, "/admin") && !under(pathname, "/admin/login");
+}

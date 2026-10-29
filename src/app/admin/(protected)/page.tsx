@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireAdminPage } from "@/auth/viewer";
 import { getDb } from "@/db/client";
 import { createDraftAction } from "@/posts/actions";
 import { formatPostDate } from "@/posts/format";
@@ -6,6 +7,7 @@ import { listAdminPosts } from "@/posts/repo";
 import styles from "../admin.module.css";
 
 export default async function AdminHome() {
+  await requireAdminPage();
   const rows = await listAdminPosts(getDb());
   return (
     <main className={styles.page}>
