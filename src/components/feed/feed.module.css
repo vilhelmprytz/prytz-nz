@@ -44,15 +44,17 @@
 }
 
 .brand {
+  margin: 0;
   font-family: var(--title-font);
   font-style: italic;
   font-size: 30px;
+  font-weight: 400;
+  line-height: 1.1;
   letter-spacing: -0.01em;
 }
 
-.brand small {
-  display: block;
-  margin-top: 4px;
+.subtitle {
+  margin: 4px 0 0;
   font-family: var(--body-font);
   font-style: normal;
   font-size: 12px;
@@ -212,6 +214,75 @@
   color: #fff;
   font-size: 15px;
   font-weight: 700;
+}
+
+/* ---------- reactions ---------- */
+
+.reactions {
+  margin-top: 18px;
+}
+
+.reactionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reaction,
+.reactionMine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.reaction:hover {
+  border-color: var(--muted);
+}
+
+.reactionMine {
+  border-color: var(--accent);
+  background: #eef2fd;
+}
+
+.reactionCount {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.reactors {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.reactors summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.reactors summary::-webkit-details-marker {
+  display: none;
+}
+
+.reactors p {
+  margin: 4px 0 0 24px;
+  color: var(--ink);
 }
 
 /* ---------- full-screen viewer ---------- */

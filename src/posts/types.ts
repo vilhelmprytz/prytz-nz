@@ -43,3 +43,9 @@ export type FeedPage = { posts: FeedPost[]; nextCursor: string | null };
 export type RoutePoint = { id: string; title: string; dateLabel: string; lat: number; lng: number };
 
 export type AdminPostRow = { id: string; title: string; status: PostStatus; takenAtLocal: string | null; photoCount: number };
+
+export type { ReactionSummary } from "@/reactions/summary";
+import type { ReactionSummary } from "@/reactions/summary";
+
+export type FeedItem = FeedPost & { reactions: ReactionSummary[] };
+export type FeedItemPage = { posts: FeedItem[]; nextCursor: string | null };

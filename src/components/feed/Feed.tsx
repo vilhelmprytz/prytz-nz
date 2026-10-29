@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import type { FeedPage, FeedPost } from "@/posts/types";
+import type { FeedItem, FeedItemPage } from "@/posts/types";
 import { Lightbox } from "./Lightbox";
 import { PostCard } from "./PostCard";
 import styles from "./feed.module.css";
@@ -11,7 +11,7 @@ export type FeedHandle = {
   showPost(id: string): Promise<void>;
 };
 
-async function fetchPage(params: Record<string, string>): Promise<FeedPage> {
+async function fetchPage(params: Record<string, string>): Promise<FeedItemPage> {
   const res = await fetch(`/api/feed?${new URLSearchParams(params)}`);
   if (!res.ok) throw new Error(`Feed request failed (${res.status})`);
   return res.json();
@@ -27,12 +27,12 @@ export function Feed({
   renderExtras,
 }: {
   ref?: Ref<FeedHandle>;
-  initialPage: FeedPage;
+  initialPage: FeedItemPage;
   focusPostId: string | null;
   activeId: string | null;
   onActiveChange: (id: string) => void;
   header: React.ReactNode;
-  renderExtras?: (post: FeedPost) => React.ReactNode;
+  renderExtras?: (post: FeedItem) => React.ReactNode;
 }) {
   const [posts, setPosts] = useState(initialPage.posts);
   const [cursor, setCursor] = useState(initialPage.nextCursor);
@@ -46,7 +46,7 @@ export function Feed({
     onActiveRef.current = onActiveChange;
   });
 
-  const append = useCallback((page: FeedPage) => {
+  const append = useCallback((page: FeedItemPage) => {
     setPosts((list) => {
       const seen = new Set(list.map((p) => p.id));
       return [...list, ...page.posts.filter((p) => !seen.has(p.id))];

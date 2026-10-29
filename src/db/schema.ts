@@ -1,4 +1,16 @@
-import { bigserial, boolean, doublePrecision, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigserial,
+  boolean,
+  doublePrecision,
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { user } from "./auth-schema";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
@@ -51,6 +63,21 @@ export const loginAttempts = pgTable(
     attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("login_attempts_ip_key_attempted_at_idx").on(t.ipKey, t.attemptedAt)],
+);
+
+export const reactions = pgTable(
+  "reactions",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId, t.emoji] })],
 );
 
 export * from "./auth-schema";

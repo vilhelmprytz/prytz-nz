@@ -7,6 +7,7 @@ test.use({ storageState: READER_STATE });
 test("newest first, drafts hidden, line breaks kept", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Vilhelm's trip" })).toBeVisible();
   await expect(page.locator("article h2")).toHaveText(["Auckland", "Museum X", "Landed!", "Leaving Stockholm"]);
   await expect(page.getByText("Secret draft")).toHaveCount(0);
   await expect(page.locator(`#post-${ids.museum}`).getByText("+3")).toBeVisible();
