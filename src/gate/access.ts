@@ -1,5 +1,6 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { getViewer } from "@/auth/viewer";
 import { getEnv } from "@/env";
 import { GATE_COOKIE, verifyGateToken } from "./token";
 
@@ -10,7 +11,8 @@ export async function hasGateCookie(): Promise<boolean> {
 }
 
 export async function readerAccess(): Promise<{ hasGate: boolean; isAdmin: boolean }> {
-  return { hasGate: await hasGateCookie(), isAdmin: false };
+  const [hasGate, viewer] = await Promise.all([hasGateCookie(), getViewer(await headers())]);
+  return { hasGate, isAdmin: viewer.isAdmin };
 }
 
 /** Server actions are POSTs to page routes; check access inside them rather than trusting the proxy alone. */

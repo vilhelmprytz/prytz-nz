@@ -21,3 +21,6 @@ export const E2E_ENV: Record<string, string> = {
   PORT: String(E2E_PORT),
   HOSTNAME: "localhost",
 };
+
+export const ADMIN_STATE = "e2e/.auth/admin.json";
+export const READER_STATE = "e2e/.auth/reader.json";

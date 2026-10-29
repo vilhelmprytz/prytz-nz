@@ -8,6 +8,10 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   use: { ...devices["Desktop Chrome"], baseURL: E2E_BASE_URL },
+  projects: [
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    { name: "chromium", dependencies: ["setup"], testIgnore: /auth\.setup\.ts/ },
+  ],
   webServer: {
     // Production build, not `next dev`: dev HMR can reload-loop pages mid-test.
     command: "bash scripts/e2e-server.sh",

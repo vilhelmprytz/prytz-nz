@@ -52,3 +52,5 @@ export const loginAttempts = pgTable(
   },
   (t) => [index("login_attempts_ip_key_attempted_at_idx").on(t.ipKey, t.attemptedAt)],
 );
+
+export * from "./auth-schema";
