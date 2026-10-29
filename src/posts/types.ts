@@ -1,0 +1,45 @@
+export type PhotoMeta = { takenAtLocal: string | null; utcOffset: string | null; lat: number | null; lng: number | null };
+
+export type PhotoView = { id: string; width: number; height: number; displayUrl: string; thumbUrl: string };
+export type EditablePhoto = PhotoView & PhotoMeta;
+
+export type UploadMeta = PhotoMeta & { width: number; height: number; contentType: "image/webp" | "image/jpeg" };
+
+export type PostStatus = "draft" | "published";
+
+export type EditablePost = {
+  id: string;
+  title: string;
+  description: string;
+  placeName: string;
+  lat: number | null;
+  lng: number | null;
+  /** Wall-clock time at the place, `YYYY-MM-DDTHH:mm:ss`. */
+  takenAtLocal: string | null;
+  utcOffset: string | null;
+  status: PostStatus;
+  headlinePhotoId: string | null;
+  /** Ready photos only, in display order. */
+  photos: EditablePhoto[];
+};
+
+export type PostFieldsInput = Omit<EditablePost, "id" | "status" | "photos"> & { photoOrder: string[] };
+
+export type FeedPost = {
+  id: string;
+  title: string;
+  description: string;
+  placeName: string;
+  lat: number;
+  lng: number;
+  takenAtLocal: string;
+  headline: PhotoView;
+  /** Every other photo, excluding the headline. */
+  photos: PhotoView[];
+};
+
+export type FeedPage = { posts: FeedPost[]; nextCursor: string | null };
+
+export type RoutePoint = { id: string; title: string; dateLabel: string; lat: number; lng: number };
+
+export type AdminPostRow = { id: string; title: string; status: PostStatus; takenAtLocal: string | null; photoCount: number };
