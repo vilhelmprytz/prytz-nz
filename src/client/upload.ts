@@ -34,15 +34,43 @@ export type UploadStage =
   | { kind: "uploading"; pct: number }
   | { kind: "failed"; message: string };
 
-function putWithProgress(url: string, blob: Blob, contentType: string, onProgress: (fraction: number) => void) {
+/** With no progress for this long, the connection is treated as dead (mobile dead zones hang rather than fail). */
+export const STALL_MS = 30_000;
+
+export function putWithProgress(
+  url: string,
+  blob: Blob,
+  contentType: string,
+  onProgress: (fraction: number) => void,
+  stallMs = STALL_MS,
+) {
   return new Promise<Response>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const fail = (message: string) => {
+      clearTimeout(watchdog);
+      reject(new TypeError(message));
+    };
+    const arm = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        xhr.abort();
+        fail("Upload stalled");
+      }, stallMs);
+    };
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Type", contentType);
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
-    xhr.onload = () => resolve(new Response(null, { status: xhr.status }));
-    xhr.onerror = () => reject(new TypeError("Network error"));
-    xhr.ontimeout = () => reject(new TypeError("Network timeout"));
+    xhr.upload.onprogress = (e) => {
+      arm();
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      clearTimeout(watchdog);
+      resolve(new Response(null, { status: xhr.status }));
+    };
+    xhr.onerror = () => fail("Network error");
+    xhr.ontimeout = () => fail("Network timeout");
+    arm();
     xhr.send(blob);
   });
 }
