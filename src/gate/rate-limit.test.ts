@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb } from "@/db/test-db";
-import { isLockedOut, recordAttempt } from "./rate-limit";
+import { attemptUnlock, isLockedOut, recordAttempt } from "./rate-limit";
 
 const T0 = Date.UTC(2026, 9, 27, 12);
 const at = (min: number) => new Date(T0 + min * 60_000);
@@ -35,4 +35,16 @@ test("a success clears earlier failures", async () => {
 test("other keys unaffected", async () => {
   for (const m of [0, 1, 2, 3, 4]) await recordAttempt(db, "a", false, at(m));
   expect(await isLockedOut(db, "b", at(5))).toBe(false);
+});
+
+test("parallel wrong guesses can't get past the limit", async () => {
+  const results = await Promise.all(Array.from({ length: 12 }, () => attemptUnlock(db, "a", false, at(0))));
+  expect(results.filter((r) => r === "wrong")).toHaveLength(5);
+  expect(results.filter((r) => r === "locked")).toHaveLength(7);
+});
+
+test("attemptUnlock: right password is ok, and nothing is checked once locked", async () => {
+  expect(await attemptUnlock(db, "a", true, at(0))).toBe("ok");
+  for (const m of [1, 2, 3, 4, 5]) expect(await attemptUnlock(db, "a", false, at(m))).toBe("wrong");
+  expect(await attemptUnlock(db, "a", true, at(6))).toBe("locked");
 });

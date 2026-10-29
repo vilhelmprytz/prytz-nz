@@ -7,7 +7,7 @@ import { getDb } from "@/db/client";
 import { getEnv } from "@/env";
 import { clientIp, rateLimitKey } from "@/gate/client-ip";
 import { safeNextPath } from "@/gate/paths";
-import { isLockedOut, recordAttempt } from "@/gate/rate-limit";
+import { attemptUnlock } from "@/gate/rate-limit";
 import { createGateToken, GATE_COOKIE, GATE_MAX_AGE_S } from "@/gate/token";
 
 export type UnlockState = { error?: string };
@@ -22,12 +22,11 @@ export async function unlock(_prev: UnlockState, formData: FormData): Promise<Un
   console.info("[unlock] ip=%s key=%s", ip, key);
 
   const now = new Date();
-  if (await isLockedOut(db, key, now)) return { error: "Too many tries. Try again in 15 minutes." };
-
   const password = String(formData.get("password") ?? "");
   const ok = timingSafeEqual(digest(password), digest(env.FAMILY_PASSWORD));
-  await recordAttempt(db, key, ok, now);
-  if (!ok) return { error: "That's not the password." };
+  const result = await attemptUnlock(db, key, ok, now);
+  if (result === "locked") return { error: "Too many tries. Try again in 15 minutes." };
+  if (result === "wrong") return { error: "That's not the password." };
 
   (await cookies()).set(GATE_COOKIE, createGateToken(now.getTime(), env.FAMILY_PASSWORD, env.BETTER_AUTH_SECRET), {
     httpOnly: true,

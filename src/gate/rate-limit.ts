@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, lt, lte, max } from "drizzle-orm";
+import { and, asc, eq, gt, lt, lte, max, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { loginAttempts } from "@/db/schema";
 
@@ -41,4 +41,22 @@ export async function isLockedOut(db: Db, ipKey: string, now: Date): Promise<boo
 export async function recordAttempt(db: Db, ipKey: string, success: boolean, now: Date): Promise<void> {
   await db.insert(loginAttempts).values({ ipKey, success, attemptedAt: now });
   await db.delete(loginAttempts).where(lt(loginAttempts.attemptedAt, new Date(now.getTime() - RETENTION_MS)));
+}
+
+/**
+ * Checks the lockout and records the attempt as one step. A per-IP advisory lock serialises
+ * concurrent guesses, so a burst of parallel requests can't all pass the check before any is recorded.
+ */
+export async function attemptUnlock(
+  db: Db,
+  ipKey: string,
+  passwordOk: boolean,
+  now: Date,
+): Promise<"ok" | "wrong" | "locked"> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ipKey}))`);
+    if (await isLockedOut(tx, ipKey, now)) return "locked";
+    await recordAttempt(tx, ipKey, passwordOk, now);
+    return passwordOk ? "ok" : "wrong";
+  });
 }
