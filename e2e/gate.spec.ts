@@ -26,6 +26,8 @@ test.describe("lockout", () => {
         page.waitForResponse((r) => r.request().method() === "POST"),
         page.getByRole("button", { name: "Open" }).click(),
       ]);
+      // React clears the form once the action settles, which can land after the response.
+      await expect(page.getByLabel("Password")).toHaveValue("");
     };
     for (let i = 0; i < 5; i++) await submit("nope");
     await submit("e2e-password");
