@@ -7,16 +7,23 @@ export async function resizeImage(file: Blob, maxEdge: number, quality: number):
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
 
+  // The default "low" smoothing visibly aliases big downscales (2560 → 640 thumbnails).
+  const draw = (ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D) => {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, 0, 0, width, height);
+  };
+
   const encode = async (type: string): Promise<Blob> => {
     if (typeof OffscreenCanvas !== "undefined") {
       const canvas = new OffscreenCanvas(width, height);
-      canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
+      draw(canvas.getContext("2d")!);
       return canvas.convertToBlob({ type, quality });
     }
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, width, height);
+    draw(canvas.getContext("2d")!);
     return new Promise((resolve, reject) =>
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not encode image"))), type, quality),
     );
