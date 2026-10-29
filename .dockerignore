@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+.env
+.env*.local
+.superpowers
+.storage
+.storage-e2e
+test-results
+playwright-report
+e2e/.auth
