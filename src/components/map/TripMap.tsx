@@ -25,7 +25,7 @@ export default function TripMap({
   onSelect,
   onHide,
 }: {
-  /** Published posts, oldest first. */
+  /** Every place of every published post, in travel order (a travel day contributes several). */
   points: RoutePoint[];
   activeId: string | null;
   onSelect: (id: string) => void;
@@ -33,7 +33,7 @@ export default function TripMap({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
-  const markers = useRef(new Map<string, L.Marker>());
+  const markers = useRef<{ postId: string; marker: L.Marker }[]>([]);
   const onSelectRef = useRef(onSelect);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function TripMap({
   const fitAll = () => {
     const m = map.current;
     if (!m) return;
-    const latlngs = [...markers.current.values()].map((mk) => mk.getLatLng());
+    const latlngs = markers.current.map(({ marker }) => marker.getLatLng());
     if (latlngs.length === 0) m.setView([20, 0], 2);
     else if (latlngs.length === 1) m.setView(latlngs[0], 8);
     else m.fitBounds(L.latLngBounds(latlngs), { padding: FIT_PADDING });
@@ -66,23 +66,22 @@ export default function TripMap({
       ).addTo(m);
     }
     for (const p of route) {
-      const marker = L.marker([p.lat, p.lng], { icon: dotIcon(p.id), keyboard: false })
+      const marker = L.marker([p.lat, p.lng], { icon: dotIcon(p.postId), keyboard: false })
         .bindTooltip(`${p.title} · ${p.dateLabel}`, { className: styles.label, direction: "right", offset: [12, 0] })
-        .on("click", () => onSelectRef.current(p.id))
+        .on("click", () => onSelectRef.current(p.postId))
         .addTo(m);
-      markers.current.set(p.id, marker);
+      markers.current.push({ postId: p.postId, marker });
     }
     fitAll();
 
     // The layout resizes the map (show/hide, phone rotation); Leaflet needs to be told.
     const resize = new ResizeObserver(() => m.invalidateSize());
     resize.observe(el);
-    const registry = markers.current;
     return () => {
       resize.disconnect();
       m.remove();
       map.current = null;
-      registry.clear();
+      markers.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the route is fixed for the page's lifetime
   }, []);
@@ -90,16 +89,19 @@ export default function TripMap({
   useEffect(() => {
     const m = map.current;
     if (!m) return;
-    for (const [id, marker] of markers.current) {
-      const dot = marker.getElement()?.querySelector(".trip-dot");
-      dot?.classList.toggle("active", id === activeId);
-      if (id === activeId) {
-        marker.openTooltip();
-        if (!m.getBounds().pad(-0.15).contains(marker.getLatLng())) m.panTo(marker.getLatLng());
-      } else {
-        marker.closeTooltip();
-      }
+    const active = markers.current.filter((e) => e.postId === activeId);
+    for (const { postId, marker } of markers.current) {
+      marker.getElement()?.querySelector(".trip-dot")?.classList.toggle("active", postId === activeId);
+      marker.closeTooltip();
     }
+    if (active.length === 0) return;
+    // One label per post, on the place where its day ended.
+    active.at(-1)!.marker.openTooltip();
+    const latlngs = active.map(({ marker }) => marker.getLatLng());
+    if (latlngs.every((ll) => m.getBounds().pad(-0.15).contains(ll))) return;
+    if (latlngs.length === 1) m.panTo(latlngs[0]);
+    // Zoom out just enough to show the whole travel day, never in.
+    else m.fitBounds(L.latLngBounds(latlngs), { padding: FIT_PADDING, maxZoom: m.getZoom() });
   }, [activeId]);
 
   return (

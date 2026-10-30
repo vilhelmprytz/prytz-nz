@@ -20,8 +20,7 @@ setup("seed journal content", async () => {
   async function post(opts: {
     title: string;
     date: string;
-    lat: number;
-    lng: number;
+    points: { lat: number; lng: number }[];
     photos: number;
     description?: string;
     publish?: boolean;
@@ -49,8 +48,7 @@ setup("seed journal content", async () => {
       title: opts.title,
       description: opts.description ?? `A day in ${opts.title}.`,
       placeName: `${opts.title} place`,
-      lat: opts.lat,
-      lng: opts.lng,
+      points: opts.points,
       takenAtLocal: `${opts.date}T12:00:00`,
       utcOffset: null,
       headlinePhotoId: current.headlinePhotoId,
@@ -64,14 +62,22 @@ setup("seed journal content", async () => {
   }
 
   const ids: SeedIds = {
-    stockholm: (await post({ title: "Leaving Stockholm", date: "2026-10-15", lat: 59.33, lng: 18.07, photos: 1 })).id,
-    landed: (await post({ title: "Landed!", date: "2026-10-18", lat: 34.05, lng: -118.24, photos: 1 })).id,
+    stockholm: (await post({ title: "Leaving Stockholm", date: "2026-10-15", points: [{ lat: 59.33, lng: 18.07 }], photos: 1 })).id,
+    landed: (await post({ title: "Landed!",
+        date: "2026-10-18",
+        // A travel day: ARN → LHR → LAX
+        points: [
+          { lat: 59.65, lng: 17.92 },
+          { lat: 51.47, lng: -0.45 },
+          { lat: 33.94, lng: -118.41 },
+        ],
+        photos: 1 })).id,
     museum: (
-      await post({ title: "Museum X", date: "2026-10-24", lat: 37.77, lng: -122.47, photos: 8, description: "Line one\nLine two" })
+      await post({ title: "Museum X", date: "2026-10-24", points: [{ lat: 37.77, lng: -122.47 }], photos: 8, description: "Line one\nLine two" })
     ).id,
-    auckland: (await post({ title: "Auckland", date: "2026-11-01", lat: -36.85, lng: 174.76, photos: 2 })).id,
+    auckland: (await post({ title: "Auckland", date: "2026-11-01", points: [{ lat: -36.85, lng: 174.76 }], photos: 2 })).id,
     ...(await (async () => {
-      const draft = await post({ title: "Secret draft", date: "2026-11-03", lat: 1, lng: 1, photos: 1, publish: false });
+      const draft = await post({ title: "Secret draft", date: "2026-11-03", points: [{ lat: 1, lng: 1 }], photos: 1, publish: false });
       return { draft: draft.id, draftPhoto: draft.photoIds[0] };
     })()),
   };

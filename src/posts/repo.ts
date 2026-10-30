@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, inArray, lt, max, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { photos, posts } from "@/db/schema";
+import { photos, postPoints, posts } from "@/db/schema";
 import type { Storage } from "@/storage/types";
 import { formatPostDate } from "./format";
 import type {
@@ -10,6 +10,7 @@ import type {
   EditablePost,
   FeedPage,
   FeedPost,
+  LatLng,
   PhotoView,
   PostFieldsInput,
   RoutePoint,
@@ -52,6 +53,14 @@ const readyPhotosOf = (db: Db, postIds: string[]) =>
 
 // ---------- editing ----------
 
+async function pointsOf(db: Db, postId: string): Promise<LatLng[]> {
+  return db
+    .select({ lat: postPoints.lat, lng: postPoints.lng })
+    .from(postPoints)
+    .where(eq(postPoints.postId, postId))
+    .orderBy(asc(postPoints.position));
+}
+
 export async function createDraft(db: Db): Promise<string> {
   const [row] = await db.insert(posts).values({}).returning({ id: posts.id });
   return row.id;
@@ -60,14 +69,13 @@ export async function createDraft(db: Db): Promise<string> {
 export async function getPostForEdit(db: Db, id: string): Promise<EditablePost | null> {
   const [post] = await db.select().from(posts).where(eq(posts.id, id));
   if (!post) return null;
-  const rows = await readyPhotosOf(db, [id]);
+  const [rows, points] = await Promise.all([readyPhotosOf(db, [id]), pointsOf(db, id)]);
   return {
     id: post.id,
     title: post.title,
     description: post.description,
     placeName: post.placeName,
-    lat: post.lat,
-    lng: post.lng,
+    points,
     takenAtLocal: isoLocal(post.takenAtLocal),
     utcOffset: post.utcOffset,
     status: post.status,
@@ -84,14 +92,18 @@ export async function savePostFields(db: Db, id: string, input: PostFieldsInput)
       title: input.title,
       description: input.description,
       placeName: input.placeName,
-      lat: input.lat,
-      lng: input.lng,
       takenAtLocal: input.takenAtLocal,
       utcOffset: input.utcOffset,
       headlinePhotoId: input.headlinePhotoId && owned.has(input.headlinePhotoId) ? input.headlinePhotoId : null,
       updatedAt: new Date(),
     })
     .where(eq(posts.id, id));
+  await db.transaction(async (tx) => {
+    await tx.delete(postPoints).where(eq(postPoints.postId, id));
+    if (input.points.length > 0) {
+      await tx.insert(postPoints).values(input.points.map((p, position) => ({ postId: id, position, lat: p.lat, lng: p.lng })));
+    }
+  });
   const order = input.photoOrder.filter((photoId) => owned.has(photoId));
   for (const [i, photoId] of order.entries()) {
     await db.update(photos).set({ sortOrder: i }).where(eq(photos.id, photoId));
@@ -104,7 +116,7 @@ export function validateForPublish(post: EditablePost): string[] {
   if (!post.headlinePhotoId || !post.photos.some((p) => p.id === post.headlinePhotoId)) {
     errors.push("Choose a headline photo");
   }
-  if (post.lat === null || post.lng === null) errors.push("Set a location");
+  if (post.points.length === 0) errors.push("Set a location");
   if (!post.takenAtLocal) errors.push("Set a date");
   return errors;
 }
@@ -269,8 +281,6 @@ const feedColumns = {
   title: posts.title,
   description: posts.description,
   placeName: posts.placeName,
-  lat: posts.lat,
-  lng: posts.lng,
   takenAtLocal: posts.takenAtLocal,
   headlinePhotoId: posts.headlinePhotoId,
   createdAtText: sql<string>`${posts.createdAt}::text`,
@@ -321,14 +331,12 @@ export async function listFeedPage(
   for (const r of pageRows) {
     const own = photoRows.filter((p) => p.postId === r.id);
     const headline = own.find((p) => p.id === r.headlinePhotoId) ?? own[0];
-    if (!headline || r.lat === null || r.lng === null || !r.takenAtLocal) continue;
+    if (!headline || !r.takenAtLocal) continue;
     feedPosts.push({
       id: r.id,
       title: r.title,
       description: r.description,
       placeName: r.placeName,
-      lat: r.lat,
-      lng: r.lng,
       takenAtLocal: isoLocal(r.takenAtLocal)!,
       headline: photoView(headline),
       photos: own.filter((p) => p.id !== headline.id).map(photoView),
@@ -344,13 +352,20 @@ export async function listFeedPage(
 
 export async function listRoutePoints(db: Db): Promise<RoutePoint[]> {
   const rows = await db
-    .select({ id: posts.id, title: posts.title, lat: posts.lat, lng: posts.lng, takenAtLocal: posts.takenAtLocal })
-    .from(posts)
+    .select({
+      postId: posts.id,
+      title: posts.title,
+      takenAtLocal: posts.takenAtLocal,
+      lat: postPoints.lat,
+      lng: postPoints.lng,
+    })
+    .from(postPoints)
+    .innerJoin(posts, eq(posts.id, postPoints.postId))
     .where(eq(posts.status, "published"))
-    .orderBy(asc(posts.takenAtLocal), asc(posts.createdAt), asc(posts.id));
+    .orderBy(asc(posts.takenAtLocal), asc(posts.createdAt), asc(posts.id), asc(postPoints.position));
   return rows.flatMap((r) =>
-    r.lat === null || r.lng === null || !r.takenAtLocal
-      ? []
-      : [{ id: r.id, title: r.title, dateLabel: formatPostDate(isoLocal(r.takenAtLocal)!), lat: r.lat, lng: r.lng }],
+    r.takenAtLocal
+      ? [{ postId: r.postId, title: r.title, dateLabel: formatPostDate(isoLocal(r.takenAtLocal)!), lat: r.lat, lng: r.lng }]
+      : [],
   );
 }

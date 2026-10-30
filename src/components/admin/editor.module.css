@@ -182,10 +182,20 @@
 }
 
 .pin {
+  display: grid;
+  place-items: center;
   background: var(--accent);
-  border: 3px solid #fff;
+  border: 2px solid #fff;
   border-radius: 50%;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font: 700 12px var(--body-font);
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .errors {

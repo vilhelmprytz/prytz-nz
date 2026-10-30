@@ -46,7 +46,12 @@ async function readyPhoto(postId: string) {
   return r.photo;
 }
 
-async function makePublished(title: string, takenAtLocal: string, nPhotos: number, lat = 1, lng = 2) {
+async function makePublished(
+  title: string,
+  takenAtLocal: string,
+  nPhotos: number,
+  points: { lat: number; lng: number }[] = [{ lat: 1, lng: 2 }],
+) {
   const id = await createDraft(db);
   for (let i = 0; i < nPhotos; i++) await readyPhoto(id);
   const post = (await getPostForEdit(db, id))!;
@@ -54,8 +59,7 @@ async function makePublished(title: string, takenAtLocal: string, nPhotos: numbe
     title,
     description: "",
     placeName: "Somewhere",
-    lat,
-    lng,
+    points,
     takenAtLocal,
     utcOffset: null,
     headlinePhotoId: post.headlinePhotoId,
@@ -106,11 +110,57 @@ test("empty feed → no posts, null cursor; empty route", async () => {
 
 test("route points oldest first with date labels", async () => {
   await makePublished("C", "2026-10-24T10:00:00", 1);
-  await makePublished("A", "2026-10-18T10:00:00", 1, -36.85, 174.76);
+  const a = await makePublished("A", "2026-10-18T10:00:00", 1, [{ lat: -36.85, lng: 174.76 }]);
   await makePublished("B", "2026-10-21T10:00:00", 1);
   const route = await listRoutePoints(db);
   expect(route.map((r) => r.title)).toEqual(["A", "B", "C"]);
-  expect(route[0]).toMatchObject({ dateLabel: "Sun 18 Oct", lat: -36.85, lng: 174.76 });
+  expect(route[0]).toEqual({ postId: a, title: "A", dateLabel: "Sun 18 Oct", lat: -36.85, lng: 174.76 });
+});
+
+test("a travel day contributes every point, in order, between its neighbours", async () => {
+  await makePublished("Before", "2026-10-14T10:00:00", 1, [{ lat: 59.33, lng: 18.07 }]);
+  const day = await makePublished("Travel day", "2026-10-15T10:00:00", 1, [
+    { lat: 59.65, lng: 17.92 },
+    { lat: 51.47, lng: -0.45 },
+    { lat: 33.94, lng: -118.41 },
+  ]);
+  await makePublished("After", "2026-10-16T10:00:00", 1, [{ lat: 34.05, lng: -118.24 }]);
+  const route = await listRoutePoints(db);
+  expect(route.map((r) => [r.title, r.lat])).toEqual([
+    ["Before", 59.33],
+    ["Travel day", 59.65],
+    ["Travel day", 51.47],
+    ["Travel day", 33.94],
+    ["After", 34.05],
+  ]);
+  expect(route.filter((r) => r.postId === day)).toHaveLength(3);
+});
+
+test("saving replaces a post's points; publishing needs at least one", async () => {
+  const id = await makePublished("Trip", "2026-10-15T10:00:00", 1, [
+    { lat: 1, lng: 1 },
+    { lat: 2, lng: 2 },
+    { lat: 3, lng: 3 },
+  ]);
+  expect((await getPostForEdit(db, id))!.points).toEqual([
+    { lat: 1, lng: 1 },
+    { lat: 2, lng: 2 },
+    { lat: 3, lng: 3 },
+  ]);
+  const post = (await getPostForEdit(db, id))!;
+  const fields = {
+    title: post.title,
+    description: post.description,
+    placeName: post.placeName,
+    takenAtLocal: post.takenAtLocal,
+    utcOffset: post.utcOffset,
+    headlinePhotoId: post.headlinePhotoId,
+  };
+  await savePostFields(db, id, { ...fields, points: [{ lat: 2, lng: 2 }], photoOrder: post.photos.map((p) => p.id) });
+  expect((await getPostForEdit(db, id))!.points).toEqual([{ lat: 2, lng: 2 }]);
+  await savePostFields(db, id, { ...fields, points: [], photoOrder: post.photos.map((p) => p.id) });
+  await setPublished(db, id, false, NOW);
+  expect(await setPublished(db, id, true, NOW)).toEqual({ ok: false, errors: ["Set a location"] });
 });
 
 test("publish validation lists every missing field", async () => {
@@ -182,7 +232,7 @@ test("savePostFields reorders photos; admin list shows drafts first then newest"
   const a = await readyPhoto(postId);
   const b = await readyPhoto(postId);
   await savePostFields(db, postId, {
-    title: "T", description: "d", placeName: "", lat: null, lng: null, takenAtLocal: null, utcOffset: null,
+    title: "T", description: "d", placeName: "", points: [], takenAtLocal: null, utcOffset: null,
     headlinePhotoId: b.id, photoOrder: [b.id, a.id],
   });
   const post = (await getPostForEdit(db, postId))!;

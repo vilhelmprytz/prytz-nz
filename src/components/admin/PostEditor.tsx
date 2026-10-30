@@ -6,8 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { pickPostDefaults } from "@/client/post-defaults";
 import { uploadPhoto, type UploadStage } from "@/client/upload";
 import { deletePostAction, publishAction, removePhotoAction, savePostAction, unpublishAction } from "@/posts/actions";
-import type { EditablePost, PostFieldsInput } from "@/posts/types";
-import type { LocationSource, PickedLocation } from "./LocationPicker";
+import type { EditablePost, LatLng, PostFieldsInput } from "@/posts/types";
+import type { LocationSource } from "./LocationPicker";
 import { PhotoTray, type TrayItem } from "./PhotoTray";
 import styles from "./editor.module.css";
 
@@ -37,8 +37,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     title: initial.title,
     description: initial.description,
     placeName: initial.placeName,
-    lat: initial.lat,
-    lng: initial.lng,
+    points: initial.points,
     takenAtLocal: initial.takenAtLocal,
     utcOffset: initial.utcOffset,
     headlinePhotoId: initial.headlinePhotoId,
@@ -57,7 +56,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
   // Which values the admin set by hand; photo defaults never overwrite those.
   const byHand = useRef({
     date: initial.takenAtLocal !== null,
-    location: initial.lat !== null,
+    location: initial.points.length > 0,
     place: initial.placeName !== "",
   });
 
@@ -119,9 +118,15 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
       patch.takenAtLocal = defaults.takenAtLocal;
       patch.utcOffset = defaults.utcOffset;
     }
-    if (!byHand.current.location && defaults.lat !== null && (defaults.lat !== current.lat || defaults.lng !== current.lng)) {
-      patch.lat = defaults.lat;
-      patch.lng = defaults.lng;
+    // Photo GPS only ever sets the first and only point; a travel day's extra stops are added by hand.
+    const first = current.points[0];
+    if (
+      !byHand.current.location &&
+      defaults.lat !== null &&
+      defaults.lng !== null &&
+      (current.points.length !== 1 || first.lat !== defaults.lat || first.lng !== defaults.lng)
+    ) {
+      patch.points = [{ lat: defaults.lat, lng: defaults.lng }];
       setLocationSource("photo");
     }
     if (Object.keys(patch).length > 0) update(patch);
@@ -187,23 +192,25 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     }
   }
 
-  // ---------- place name ----------
+  // ---------- place name (from the last point: where the day ended) ----------
+  const lastLat = fields.points.at(-1)?.lat ?? null;
+  const lastLng = fields.points.at(-1)?.lng ?? null;
   useEffect(() => {
-    if (byHand.current.place || fields.lat === null || fields.lng === null) return;
+    if (byHand.current.place || lastLat === null || lastLng === null) return;
     const controller = new AbortController();
-    fetch(`/api/admin/geocode?lat=${fields.lat}&lng=${fields.lng}`, { signal: controller.signal })
+    fetch(`/api/admin/geocode?lat=${lastLat}&lng=${lastLng}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((d: { placeName?: string }) => {
         if (d.placeName && !byHand.current.place) update({ placeName: d.placeName });
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [fields.lat, fields.lng, update]);
+  }, [lastLat, lastLng, update]);
 
-  function pickLocation(v: PickedLocation) {
+  function changePoints(points: LatLng[], source: LocationSource) {
     byHand.current.location = true;
-    setLocationSource(v.source);
-    update({ lat: v.lat, lng: v.lng });
+    setLocationSource(source);
+    update({ points });
   }
 
   // ---------- publishing ----------
@@ -223,7 +230,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     await deletePostAction(postId);
   }
 
-  const missingLocation = !uploading && photos.length > 0 && (fields.lat === null || fields.lng === null);
+  const missingLocation = !uploading && photos.length > 0 && fields.points.length === 0;
 
   return (
     <main className={styles.editor}>
@@ -289,7 +296,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
         {missingLocation && (
           <p className={styles.notice}>No location in these photos. Use your current location or drop a pin.</p>
         )}
-        <LocationPicker value={{ lat: fields.lat, lng: fields.lng }} onChange={pickLocation} />
+        <LocationPicker points={fields.points} onChange={changePoints} />
         <label className={styles.field}>
           <span>Place</span>
           <input

@@ -1,3 +1,5 @@
+export type LatLng = { lat: number; lng: number };
+
 export type PhotoMeta = { takenAtLocal: string | null; utcOffset: string | null; lat: number | null; lng: number | null };
 
 export type PhotoView = { id: string; width: number; height: number; displayUrl: string; thumbUrl: string };
@@ -12,8 +14,8 @@ export type EditablePost = {
   title: string;
   description: string;
   placeName: string;
-  lat: number | null;
-  lng: number | null;
+  /** Places in travel order; one for most posts, several for a travel day. */
+  points: LatLng[];
   /** Wall-clock time at the place, `YYYY-MM-DDTHH:mm:ss`. */
   takenAtLocal: string | null;
   utcOffset: string | null;
@@ -30,8 +32,6 @@ export type FeedPost = {
   title: string;
   description: string;
   placeName: string;
-  lat: number;
-  lng: number;
   takenAtLocal: string;
   headline: PhotoView;
   /** Every other photo, excluding the headline. */
@@ -40,7 +40,8 @@ export type FeedPost = {
 
 export type FeedPage = { posts: FeedPost[]; nextCursor: string | null };
 
-export type RoutePoint = { id: string; title: string; dateLabel: string; lat: number; lng: number };
+/** One per place: a post with three points contributes three, all carrying its id. */
+export type RoutePoint = { postId: string; title: string; dateLabel: string; lat: number; lng: number };
 
 export type AdminPostRow = { id: string; title: string; status: PostStatus; takenAtLocal: string | null; photoCount: number };
 

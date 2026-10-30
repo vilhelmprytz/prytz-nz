@@ -19,8 +19,6 @@ export const posts = pgTable("posts", {
   title: text("title").notNull().default(""),
   description: text("description").notNull().default(""),
   placeName: text("place_name").notNull().default(""),
-  lat: doublePrecision("lat"),
-  lng: doublePrecision("lng"),
   // Wall-clock time at the place the photos were taken; posts sort by this.
   takenAtLocal: timestamp("taken_at_local", { mode: "string" }),
   utcOffset: text("utc_offset"),
@@ -30,6 +28,20 @@ export const posts = pgTable("posts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   publishedAt: timestamp("published_at", { withTimezone: true }),
 });
+
+/** A post's places in travel order: one for most posts, several for a travel day (ARN → LHR → LAX). */
+export const postPoints = pgTable(
+  "post_points",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.position] })],
+);
 
 export const photos = pgTable(
   "photos",

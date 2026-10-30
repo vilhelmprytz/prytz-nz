@@ -79,3 +79,37 @@ test("draft survives reload", async ({ page }) => {
   await page.reload();
   await expect(page.getByLabel("Title")).toHaveValue("Half-written");
 });
+
+test("tapping the map three times makes a travel day with three dots", async ({ page }) => {
+  await newPost(page);
+  const postId = page.url().split("/").pop()!;
+  await page.getByLabel("Add photos").setInputFiles([jpeg("t.jpg", await makeJpeg(page, {}))]);
+  await expect(page.getByTestId("photo-tile").filter({ hasText: "Done" })).toHaveCount(1);
+
+  const map = page.getByTestId("location-map");
+  for (const [x, y] of [[80, 80], [180, 120], [280, 160]]) await map.click({ position: { x, y } });
+  const points = page.getByTestId("route-point");
+  await expect(points).toHaveCount(3);
+  await expect(points).toHaveText(["1", "2", "3"]);
+  await expect(page.getByTestId("location-source")).toHaveText("Pinned by hand");
+
+  // Tapping a point removes it; tapping the map again adds one at the end.
+  await points.nth(1).click();
+  await expect(points).toHaveCount(2);
+  await map.click({ position: { x: 200, y: 200 } });
+  await expect(points).toHaveCount(3);
+
+  await page.getByLabel("Title").fill("Travel day");
+  await page.getByLabel("Date").fill("2026-10-16T08:00");
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page.getByRole("button", { name: "Unpublish" })).toBeVisible();
+  await page.goto("/");
+  await expect(page.locator(`.trip-dot[data-post-id="${postId}"]`)).toHaveCount(3);
+
+  // Clean up so the reader specs see only seeded posts.
+  await page.goto(`/admin/posts/${postId}`);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page).toHaveURL("/admin");
+});

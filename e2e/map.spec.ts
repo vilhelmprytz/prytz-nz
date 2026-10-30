@@ -4,20 +4,31 @@ import { seedIds } from "./seed";
 
 test.use({ storageState: READER_STATE });
 
-test("one dot per published post; clicking the oldest scrolls to it", async ({ page }) => {
+test("one dot per place; clicking the oldest scrolls to it", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");
-  await expect(page.locator(".trip-dot")).toHaveCount(4);
+  // Four published posts; "Landed!" is a travel day with three places.
+  await expect(page.locator(".trip-dot")).toHaveCount(6);
   await page.locator(`.trip-dot[data-post-id="${ids.stockholm}"]`).click();
   await expect(page.locator(`#post-${ids.stockholm}`)).toBeInViewport();
 });
 
-test("scrolling activates the matching dot", async ({ page }) => {
+test("scrolling to a travel day lights up all its dots", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");
   // Put the post's top at the top of the feed, so it covers the middle "active" band.
   await page.locator(`#post-${ids.landed}`).evaluate((el) => el.scrollIntoView({ block: "start" }));
-  await expect(page.locator(`.trip-dot[data-post-id="${ids.landed}"]`)).toHaveClass(/active/);
+  const dots = page.locator(`.trip-dot[data-post-id="${ids.landed}"]`);
+  await expect(dots).toHaveCount(3);
+  for (let i = 0; i < 3; i++) await expect(dots.nth(i)).toHaveClass(/active/);
+  await expect(page.locator(`.trip-dot[data-post-id="${ids.museum}"]`)).not.toHaveClass(/active/);
+});
+
+test("clicking a travel day's middle dot jumps to that post", async ({ page }) => {
+  const ids = seedIds();
+  await page.goto("/");
+  await page.locator(`.trip-dot[data-post-id="${ids.landed}"]`).nth(1).click();
+  await expect(page.locator(`#post-${ids.landed}`)).toBeInViewport();
 });
 
 test("hide map persists across reload", async ({ page }) => {
@@ -27,7 +38,7 @@ test("hide map persists across reload", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("button", { name: "Show map" })).toBeVisible();
   await page.getByRole("button", { name: "Show map" }).click();
-  await expect(page.locator(".trip-dot")).toHaveCount(4);
+  await expect(page.locator(".trip-dot")).toHaveCount(6);
 });
 
 test("phone: map strip above feed", async ({ page }) => {
