@@ -79,11 +79,24 @@
   border-color: var(--accent);
 }
 
+.dragHandle {
+  cursor: grab;
+  /* Allow scrolling past the photos; the touch drag only starts after a short hold. */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
 .tileImage {
   display: block;
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
+  pointer-events: none;
 }
 
 .tileBar {

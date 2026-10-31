@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { pickPostDefaults } from "@/client/post-defaults";
 import { uploadPhoto, type UploadStage } from "@/client/upload";
 import { deletePostAction, publishAction, removePhotoAction, savePostAction, unpublishAction } from "@/posts/actions";
-import type { EditablePost, LatLng, PostFieldsInput } from "@/posts/types";
+import type { EditablePhoto, EditablePost, LatLng, PostFieldsInput } from "@/posts/types";
 import type { LocationSource } from "./LocationPicker";
 import { PhotoTray, type TrayItem } from "./PhotoTray";
 import styles from "./editor.module.css";
@@ -52,13 +52,23 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
 
   // Latest values for callbacks that outlive a render (timers, uploads). Only event handlers touch these.
   const fieldsRef = useRef(fields);
-  const photosRef = useRef(initial.photos);
-  // Which values the admin set by hand; photo defaults never overwrite those.
+  // Tray order (item keys, in picking/dragging order) and the finished photo behind each key.
+  const orderRef = useRef<string[]>(initial.photos.map((p) => p.id));
+  const photoByKey = useRef(new Map<string, EditablePhoto>(initial.photos.map((p) => [p.id, p])));
+  // Which values the admin set by hand; defaults never overwrite those.
   const byHand = useRef({
     date: initial.takenAtLocal !== null,
     location: initial.points.length > 0,
     place: initial.placeName !== "",
+    // A saved headline other than the first photo must have been starred.
+    headline: initial.headlinePhotoId !== null && initial.headlinePhotoId !== initial.photos[0]?.id,
   });
+
+  /** Finished photos in tray order: the order the site shows them in. */
+  const orderedPhotos = useCallback(
+    () => orderRef.current.flatMap((key) => photoByKey.current.get(key) ?? []),
+    [],
+  );
 
   const photos = items.flatMap((i) => (i.photo ? [i.photo] : []));
   const uploading = items.some((i) => i.stage.kind !== "done" && i.stage.kind !== "failed");
@@ -74,7 +84,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     dirty.current = false;
     setSaveState("saving");
     try {
-      await savePostAction(postId, { ...fieldsRef.current, photoOrder: photosRef.current.map((p) => p.id) });
+      await savePostAction(postId, { ...fieldsRef.current, photoOrder: orderedPhotos().map((p) => p.id) });
       setSaveState("saved");
       return true;
     } catch {
@@ -83,7 +93,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
       saveTimer.current = setTimeout(() => void saveRef.current(), RETRY_SAVE_MS);
       return false;
     }
-  }, [postId]);
+  }, [postId, orderedPhotos]);
 
   useEffect(() => {
     saveRef.current = save;
@@ -95,6 +105,8 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     fieldsRef.current = { ...fieldsRef.current, ...patch };
     setFields(fieldsRef.current);
     dirty.current = true;
+    // Never show "Saved" while a change is still waiting for the autosave delay.
+    setSaveState("saving");
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => void saveRef.current(), AUTOSAVE_MS);
   }, []);
@@ -107,9 +119,15 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
   const setStage = (key: string, stage: UploadStage, photo?: TrayItem["photo"]) =>
     setItems((list) => list.map((i) => (i.key === key ? { ...i, stage, photo: photo ?? i.photo } : i)));
 
+  /** After the photo order changes: unless a headline was starred, the first photo leads. Then save. */
+  const orderChanged = useCallback(() => {
+    const first = orderedPhotos()[0]?.id ?? null;
+    update(byHand.current.headline ? {} : { headlinePhotoId: first });
+  }, [update, orderedPhotos]);
+
   /** Once a batch settles, fill date and location from the photos (never over the admin's own values). */
   const applyPhotoDefaults = useCallback(() => {
-    const list = photosRef.current;
+    const list = orderedPhotos();
     if (list.length === 0) return;
     const current = fieldsRef.current;
     const defaults = pickPostDefaults(list, Math.max(0, list.findIndex((p) => p.id === current.headlinePhotoId)));
@@ -130,7 +148,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
       setLocationSource("photo");
     }
     if (Object.keys(patch).length > 0) update(patch);
-  }, [update]);
+  }, [update, orderedPhotos]);
 
   const pump = useCallback(() => {
     while (active.current < CONCURRENT_UPLOADS && queue.current.length > 0) {
@@ -138,13 +156,10 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
       active.current++;
       uploadPhoto(item.file!, postId, (stage) => setStage(item.key, stage))
         .then((photo) => {
-          photosRef.current = [...photosRef.current, photo];
+          photoByKey.current.set(item.key, photo);
           setStage(item.key, { kind: "done" }, photo);
-          // The server makes the first photo the headline; mirror that here.
-          if (!fieldsRef.current.headlinePhotoId) {
-            fieldsRef.current = { ...fieldsRef.current, headlinePhotoId: photo.id };
-            setFields(fieldsRef.current);
-          }
+          // Saves the picking order (uploads finish in any order) and the default headline.
+          orderChanged();
         })
         .catch(() => {})
         .finally(() => {
@@ -153,7 +168,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
           pumpRef.current();
         });
     }
-  }, [postId, applyPhotoDefaults]);
+  }, [postId, applyPhotoDefaults, orderChanged]);
 
   useEffect(() => {
     pumpRef.current = pump;
@@ -170,6 +185,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
       }),
     );
     setItems((list) => [...list, ...added]);
+    orderRef.current = [...orderRef.current, ...added.map((i) => i.key)];
     queue.current.push(...added);
     pump();
   }
@@ -185,11 +201,27 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     if (!item.photo) return;
     const removedId = item.photo.id;
     await removePhotoAction(removedId);
-    photosRef.current = photosRef.current.filter((p) => p.id !== removedId);
+    photoByKey.current.delete(item.key);
+    orderRef.current = orderRef.current.filter((key) => key !== item.key);
     setItems((list) => list.filter((i) => i.key !== item.key));
-    if (fieldsRef.current.headlinePhotoId === removedId) {
-      update({ headlinePhotoId: photosRef.current[0]?.id ?? null });
-    }
+    if (fieldsRef.current.headlinePhotoId === removedId) byHand.current.headline = false;
+    orderChanged();
+  }
+
+  function move(activeKey: string, overKey: string) {
+    const from = orderRef.current.indexOf(activeKey);
+    const to = orderRef.current.indexOf(overKey);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...orderRef.current];
+    next.splice(to, 0, ...next.splice(from, 1));
+    orderRef.current = next;
+    setItems((list) => next.flatMap((key) => list.find((i) => i.key === key) ?? []));
+    orderChanged();
+  }
+
+  function star(photoId: string) {
+    byHand.current.headline = true;
+    update({ headlinePhotoId: photoId });
   }
 
   // ---------- place name (from the last point: where the day ended) ----------
@@ -260,9 +292,10 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
         <PhotoTray
           items={items}
           headlineId={fields.headlinePhotoId}
-          onHeadline={(id) => update({ headlinePhotoId: id })}
+          onHeadline={star}
           onRemove={remove}
           onRetry={retry}
+          onMove={move}
         />
       </section>
 

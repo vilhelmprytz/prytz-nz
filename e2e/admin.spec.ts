@@ -113,3 +113,64 @@ test("tapping the map three times makes a travel day with three dots", async ({ 
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page).toHaveURL("/admin");
 });
+
+test("photos keep the order they were picked in, and dragging reorders them", async ({ page }) => {
+  test.setTimeout(90_000);
+  await newPost(page);
+  const postId = page.url().split("/").pop()!;
+  const tiles = page.getByTestId("photo-tile");
+  const order = () => tiles.evaluateAll((els) => els.map((el) => el.getAttribute("data-photo-id")));
+
+  // Hold back the first photo's upload so it finishes last: the order must still follow the picking.
+  let delayed = false;
+  await page.route("**/api/dev-storage/**", async (route) => {
+    if (!delayed) {
+      delayed = true;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    await route.continue();
+  });
+  const files = await Promise.all(["a", "b", "c"].map(async (n) => jpeg(`${n}.jpg`, await makeJpeg(page, {}))));
+  await page.getByLabel("Add photos").setInputFiles(files);
+  await expect(tiles.filter({ hasText: "Done" })).toHaveCount(3);
+  await page.unroute("**/api/dev-storage/**");
+  const picked = await order();
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.reload();
+  expect(await order()).toEqual(picked);
+
+  // Drag the third photo onto the first.
+  const from = (await tiles.nth(2).boundingBox())!;
+  const to = (await tiles.nth(0).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 3);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 - 10, from.y + from.height / 3, { steps: 5 });
+  await page.mouse.move(to.x + to.width / 3, to.y + to.height / 3, { steps: 15 });
+  await page.mouse.up();
+  const dragged = [picked[2], picked[0], picked[1]];
+  await expect.poll(order).toEqual(dragged);
+  // Nothing was starred, so the first photo is the headline.
+  await expect(tiles.first().getByRole("button", { name: "Headline" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.reload();
+  expect(await order()).toEqual(dragged);
+
+  // The site shows the headline first, then the rest in this order.
+  await page.getByLabel("Title").fill("Reordered");
+  await page.getByLabel("Date").fill("2026-10-17T09:00");
+  await page.getByTestId("location-map").click({ position: { x: 100, y: 100 } });
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page.getByRole("button", { name: "Unpublish" })).toBeVisible();
+  await page.goto(`/?post=${postId}`);
+  const post = page.locator(`#post-${postId}`);
+  await expect(post.locator("figure img")).toHaveAttribute("src", `/photos/${dragged[0]}/display`);
+  const thumbs = await post.locator("button img").evaluateAll((els) => els.map((el) => el.getAttribute("src")));
+  expect(thumbs).toEqual([`/photos/${dragged[1]}/thumb`, `/photos/${dragged[2]}/thumb`]);
+
+  // Clean up so the reader specs see only seeded posts.
+  await page.goto(`/admin/posts/${postId}`);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page).toHaveURL("/admin");
+});
