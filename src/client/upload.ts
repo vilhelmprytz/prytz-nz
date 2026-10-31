@@ -86,15 +86,27 @@ async function postJson<T>(url: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
+type Step = "reading" | "resizing" | "registering" | "uploading" | "finishing";
+
+/** The tile's error text. Anything that isn't one of our upload errors names the step and the browser's error. */
+export function describeUploadError(error: unknown, step: Step): string {
+  if (error instanceof UploadFailedError) return error.message;
+  const name = error instanceof Error ? error.name : "unknown error";
+  return `Couldn't read this photo (${step}: ${name})`;
+}
+
 /** Reads EXIF, resizes on the phone, uploads both sizes straight to storage, then confirms with the app. */
 export async function uploadPhoto(file: File, postId: string, onStage: (s: UploadStage) => void): Promise<EditablePhoto> {
+  let step: Step = "reading";
   try {
     onStage({ kind: "reading" });
     const meta = await readPhotoMeta(file);
+    step = "resizing";
     onStage({ kind: "resizing" });
     const display = await resizeImage(file, DISPLAY_EDGE, QUALITY);
     const thumb = await resizeImage(display.blob, THUMB_EDGE, QUALITY);
 
+    step = "registering";
     const { photoId, displayPutUrl, thumbPutUrl } = await postJson<{
       photoId: string;
       displayPutUrl: string;
@@ -105,6 +117,7 @@ export async function uploadPhoto(file: File, postId: string, onStage: (s: Uploa
     });
 
     // Progress weights the display image; the thumbnail is small.
+    step = "uploading";
     onStage({ kind: "uploading", pct: 0 });
     await uploadWithRetry(() =>
       putWithProgress(displayPutUrl, display.blob, display.contentType, (f) =>
@@ -114,13 +127,18 @@ export async function uploadPhoto(file: File, postId: string, onStage: (s: Uploa
     await uploadWithRetry(() => putWithProgress(thumbPutUrl, thumb.blob, display.contentType, () => {}));
     onStage({ kind: "uploading", pct: 100 });
 
+    step = "finishing";
     onStage({ kind: "finishing" });
     const { photo } = await postJson<{ photo: EditablePhoto }>(`/api/admin/uploads/${photoId}/complete`);
     onStage({ kind: "done" });
     return photo;
   } catch (error) {
-    const message = error instanceof UploadFailedError ? error.message : "Couldn't read this photo.";
-    onStage({ kind: "failed", message });
+    console.error("[upload] failed", {
+      step,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      file: { name: file.name, type: file.type, size: file.size, lastModified: file.lastModified },
+    });
+    onStage({ kind: "failed", message: describeUploadError(error, step) });
     throw error;
   }
 }

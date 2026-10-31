@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { putWithProgress, UploadFailedError, uploadWithRetry } from "./upload";
+import { describeUploadError, putWithProgress, UploadFailedError, uploadWithRetry } from "./upload";
 
 const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
 
@@ -80,4 +80,20 @@ test("progress keeps a slow upload alive", async () => {
   HangingXHR.last.status = 200;
   HangingXHR.last.onload?.();
   expect((await put).status).toBe(200);
+});
+
+test("upload failures keep their own message", () => {
+  expect(describeUploadError(new UploadFailedError("Upload failed. Check your connection."), "uploading")).toBe(
+    "Upload failed. Check your connection.",
+  );
+});
+
+test("other failures name the step and the browser's error, so the cause is visible", () => {
+  expect(describeUploadError(new DOMException("could not be read", "NotReadableError"), "resizing")).toBe(
+    "Couldn't read this photo (resizing: NotReadableError)",
+  );
+  expect(describeUploadError(new TypeError("Failed to fetch"), "registering")).toBe(
+    "Couldn't read this photo (registering: TypeError)",
+  );
+  expect(describeUploadError("boom", "reading")).toBe("Couldn't read this photo (reading: unknown error)");
 });
