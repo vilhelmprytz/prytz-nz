@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { describeUploadError, putWithProgress, UploadFailedError, uploadWithRetry } from "./upload";
+import { describeUploadError, diagnoseFile, putWithProgress, UploadFailedError, uploadWithRetry } from "./upload";
 
 const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
 
@@ -90,10 +90,29 @@ test("upload failures keep their own message", () => {
 
 test("other failures name the step and the browser's error, so the cause is visible", () => {
   expect(describeUploadError(new DOMException("could not be read", "NotReadableError"), "resizing")).toBe(
-    "Couldn't read this photo (resizing: NotReadableError)",
+    "Couldn't read this photo (resizing: NotReadableError: could not be read)",
   );
   expect(describeUploadError(new TypeError("Failed to fetch"), "registering")).toBe(
-    "Couldn't read this photo (registering: TypeError)",
+    "Couldn't read this photo (registering: TypeError: Failed to fetch)",
   );
   expect(describeUploadError("boom", "reading")).toBe("Couldn't read this photo (reading: unknown error)");
+});
+
+test("a note about the file is appended", () => {
+  expect(
+    describeUploadError(
+      new DOMException("The source image could not be decoded.", "InvalidStateError"),
+      "resizing",
+      "file readable, 4.2 MB",
+    ),
+  ).toBe("Couldn't read this photo (resizing: InvalidStateError: The source image could not be decoded. — file readable, 4.2 MB)");
+});
+
+test("diagnoseFile tells a readable file from one that can no longer be read", async () => {
+  expect(await diagnoseFile(new Blob([new Uint8Array(2_500_000)]))).toBe("file readable, 2.5 MB");
+  const gone = {
+    size: 4_000_000,
+    slice: () => ({ arrayBuffer: () => Promise.reject(new DOMException("gone", "NotReadableError")) }),
+  } as unknown as Blob;
+  expect(await diagnoseFile(gone)).toBe("file unreadable (NotReadableError), 4.0 MB");
 });

@@ -89,10 +89,23 @@ async function postJson<T>(url: string, body?: unknown): Promise<T> {
 type Step = "reading" | "resizing" | "registering" | "uploading" | "finishing";
 
 /** The tile's error text. Anything that isn't one of our upload errors names the step and the browser's error. */
-export function describeUploadError(error: unknown, step: Step): string {
+export function describeUploadError(error: unknown, step: Step, fileNote?: string): string {
   if (error instanceof UploadFailedError) return error.message;
-  const name = error instanceof Error ? error.name : "unknown error";
-  return `Couldn't read this photo (${step}: ${name})`;
+  const detail = error instanceof Error ? (error.message ? `${error.name}: ${error.message}` : error.name) : "unknown error";
+  return `Couldn't read this photo (${step}: ${detail}${fileNote ? ` — ${fileNote}` : ""})`;
+}
+
+const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
+
+/** Whether the picked file can still be read at all: tells "the file went away" from "it couldn't be decoded". */
+export async function diagnoseFile(file: Blob): Promise<string> {
+  try {
+    await file.slice(0, 1024).arrayBuffer();
+    return `file readable, ${megabytes(file.size)}`;
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "unknown error";
+    return `file unreadable (${name}), ${megabytes(file.size)}`;
+  }
 }
 
 /** Reads EXIF, resizes on the phone, uploads both sizes straight to storage, then confirms with the app. */
@@ -133,12 +146,14 @@ export async function uploadPhoto(file: File, postId: string, onStage: (s: Uploa
     onStage({ kind: "done" });
     return photo;
   } catch (error) {
+    const fileNote = step === "reading" || step === "resizing" ? await diagnoseFile(file) : undefined;
     console.error("[upload] failed", {
       step,
       error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      fileNote,
       file: { name: file.name, type: file.type, size: file.size, lastModified: file.lastModified },
     });
-    onStage({ kind: "failed", message: describeUploadError(error, step) });
+    onStage({ kind: "failed", message: describeUploadError(error, step, fileNote) });
     throw error;
   }
 }
