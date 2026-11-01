@@ -25,6 +25,14 @@ export function Lightbox({
   const stepRef = useRef(step);
   const closeRef = useRef(onClose);
   const swipeStart = useRef<number | null>(null);
+  const strip = useRef<HTMLDivElement>(null);
+
+  // Keep the current miniature in view as the reader swipes or uses the arrows.
+  useEffect(() => {
+    strip.current
+      ?.querySelector('[aria-current="true"]')
+      ?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [index]);
 
   useEffect(() => {
     stepRef.current = step;
@@ -65,7 +73,7 @@ export function Lightbox({
         width={photo.width}
         height={photo.height}
         alt=""
-        className={styles.lightboxImage}
+        className={n > 1 ? styles.lightboxImageWithStrip : styles.lightboxImage}
         draggable={false}
       />
       {n > 1 && (
@@ -81,9 +89,32 @@ export function Lightbox({
       <button type="button" className={styles.lightboxClose} aria-label="Close" onClick={onClose}>
         ×
       </button>
-      <div className={styles.lightboxCaption}>
+      <div className={n > 1 ? styles.lightboxCaptionWithStrip : styles.lightboxCaption}>
         {title} · {index + 1} / {n}
       </div>
+      {n > 1 && (
+        <div
+          ref={strip}
+          className={styles.miniatures}
+          data-testid="miniatures"
+          // Scrolling the row must not count as a swipe on the photo.
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
+          {photos.map((p, i) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-label={`Photo ${i + 1} of ${n}`}
+              aria-current={i === index ? "true" : undefined}
+              className={i === index ? styles.miniatureCurrent : styles.miniature}
+              onClick={() => onIndexChange(i)}
+            >
+              <img src={p.thumbUrl} alt="" loading="lazy" draggable={false} />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,6 @@
+"use client";
 /* eslint-disable @next/next/no-img-element -- photos come from our own gated /photos route, already resized */
+import { useState } from "react";
 import { formatPostDate } from "@/posts/format";
 import type { FeedPost } from "@/posts/types";
 import styles from "./feed.module.css";
@@ -16,9 +18,12 @@ export function PostCard({
   onOpenPhoto: (index: number) => void;
   children?: React.ReactNode;
 }) {
-  const thumbs = post.photos.slice(0, VISIBLE_THUMBS);
-  // The fifth tile stands in for everything not shown: "+N" counts the photos beyond the first four.
-  const hidden = post.photos.length > VISIBLE_THUMBS ? post.photos.length - (VISIBLE_THUMBS - 1) : 0;
+  const [expanded, setExpanded] = useState(false);
+  const collapsible = post.photos.length > VISIBLE_THUMBS;
+  const thumbs = expanded ? post.photos : post.photos.slice(0, VISIBLE_THUMBS);
+  // Folded, the fifth tile stands in for everything not shown: "+N" counts the photos beyond the first four.
+  const hidden = collapsible && !expanded ? post.photos.length - (VISIBLE_THUMBS - 1) : 0;
+  const total = post.photos.length + 1;
 
   return (
     <article id={`post-${post.id}`} data-post-id={post.id} className={active ? styles.postActive : styles.post}>
@@ -44,7 +49,7 @@ export function PostCard({
       </figure>
       {post.description && <p className={styles.desc}>{post.description}</p>}
       {thumbs.length > 0 && (
-        <div className={styles.gallery}>
+        <div className={styles.gallery} data-testid="gallery">
           {thumbs.map((photo, i) => {
             const isMore = hidden > 0 && i === VISIBLE_THUMBS - 1;
             return (
@@ -52,8 +57,10 @@ export function PostCard({
                 key={photo.id}
                 type="button"
                 className={styles.thumb}
-                onClick={() => onOpenPhoto(i + 1)}
-                aria-label={isMore ? `${hidden} more photos` : `Photo ${i + 2}`}
+                // "+N" opens the whole set in place; any other photo opens big.
+                onClick={() => (isMore ? setExpanded(true) : onOpenPhoto(i + 1))}
+                aria-label={isMore ? `Show all ${total} photos` : `Photo ${i + 2}`}
+                aria-expanded={isMore ? false : undefined}
               >
                 <img src={photo.thumbUrl} alt="" loading="lazy" />
                 {isMore && <span className={styles.more}>+{hidden}</span>}
@@ -61,6 +68,11 @@ export function PostCard({
             );
           })}
         </div>
+      )}
+      {collapsible && expanded && (
+        <button type="button" className={styles.showFewer} aria-expanded onClick={() => setExpanded(false)}>
+          Show fewer
+        </button>
       )}
       {children}
     </article>
