@@ -275,3 +275,27 @@ test("the screen wake lock is released once every clip is done", async ({ page }
   expect(await page.evaluate(() => (window as unknown as { locks: unknown[] }).locks.length)).toBeGreaterThan(0);
   await deleteCurrent(page);
 });
+
+test("the location picker switches to a street map without adding a place", async ({ page }) => {
+  await newPost(page);
+  const picker = page.getByTestId("location-picker");
+  const tiles = picker.locator("img.leaflet-tile");
+  await expect(tiles.first()).toHaveAttribute("src", /World_Imagery/);
+
+  await picker.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(picker.getByRole("button", { name: "Map", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(tiles.first()).toHaveAttribute("src", /World_Street_Map/);
+  await expect(picker.locator(".leaflet-control-attribution")).toContainText("OpenStreetMap");
+  await expect(page.getByTestId("route-point")).toHaveCount(0);
+
+  // The route line follows the map: blue on the street map.
+  const map = page.getByTestId("location-map");
+  for (const [x, y] of [[80, 80], [200, 150]]) await map.click({ position: { x, y } });
+  await expect(page.getByTestId("route-point")).toHaveCount(2);
+  await expect(picker.locator(".leaflet-overlay-pane path")).toHaveAttribute("stroke", "#2147d6");
+  await picker.getByRole("button", { name: "Satellite" }).click();
+  await expect(picker.locator(".leaflet-overlay-pane path")).toHaveAttribute("stroke", "#ffffff");
+  await expect(page.getByTestId("route-point")).toHaveCount(2);
+
+  await deleteCurrent(page);
+});

@@ -1,6 +1,6 @@
 # prytz.nz
 
-A private, photo-first travel journal for family and friends. Readers enter one shared family password; the admin posts from a phone after signing in with Google. Posts show up in a feed next to a satellite map of the route.
+A private, photo-first travel journal for family and friends. Readers enter one shared family password; the admin posts from a phone after signing in with Google. Posts show up in a feed next to a map of the route, in satellite or street view.
 
 - **Next.js 16** (App Router, standalone output), one container on **Dokploy**
 - **PostgreSQL** via Drizzle (migrations run automatically on startup)
@@ -88,7 +88,7 @@ Point `prytz.nz` (an `A` record, plus `AAAA` if the server has IPv6) at the Dokp
 
 ## Map imagery
 
-The satellite map uses Esri's World Imagery tiles (keyless, with the required attribution), set in [`src/geo/tiles.ts`](src/geo/tiles.ts). Esri licenses them under its Master License Agreement; for a small private site this works today, but if Esri ever starts requiring a key, swap the URL in that file for another satellite provider with a free tier (for example MapTiler `satellite-v2`, which needs a free API key).
+The maps use Esri's World Imagery (satellite) and World Street Map tiles, both keyless and with the required attribution, set in [`src/geo/tiles.ts`](src/geo/tiles.ts). Readers switch between them with the Satellite / Map toggle, and each browser remembers its choice; the editor's location picker has the same toggle. Esri licenses the tiles under its Master License Agreement; for a small private site this works today, but if Esri ever starts requiring a key, swap the URLs in that file for another provider with a free tier (for example MapTiler, which needs a free API key). CARTO's basemaps were considered for the street map, but they now require an API key too.
 
 ## Day-to-day
 

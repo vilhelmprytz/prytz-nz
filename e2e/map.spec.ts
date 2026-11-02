@@ -49,3 +49,48 @@ test("phone: map strip above feed", async ({ page }) => {
   expect(map!.y).toBeLessThan(first!.y);
   expect(map!.height).toBeGreaterThan(200);
 });
+
+test("street map: tiles, credits and route colour switch, and the choice is remembered", async ({ page }) => {
+  await page.goto("/");
+  const map = page.getByTestId("trip-map");
+  const tiles = map.locator("img.leaflet-tile");
+  const route = map.locator(".leaflet-overlay-pane path");
+  const credits = map.locator(".leaflet-control-attribution");
+
+  // Satellite by default.
+  await expect(map.getByRole("button", { name: "Satellite" })).toHaveAttribute("aria-pressed", "true");
+  await expect(tiles.first()).toHaveAttribute("src", /World_Imagery/);
+  await expect(route).toHaveAttribute("stroke", "#ffffff");
+
+  await map.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(map.getByRole("button", { name: "Map", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(tiles.first()).toHaveAttribute("src", /World_Street_Map/);
+  await expect(map.locator('img.leaflet-tile[src*="World_Imagery"]')).toHaveCount(0);
+  await expect(credits).toContainText("OpenStreetMap");
+  await expect(credits).not.toContainText("Vantor");
+  await expect(route).toHaveAttribute("stroke", "#2147d6");
+  await expect(page.locator(".trip-dot")).toHaveCount(6);
+
+  await page.reload();
+  await expect(map.getByRole("button", { name: "Map", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(tiles.first()).toHaveAttribute("src", /World_Street_Map/);
+  await expect(route).toHaveAttribute("stroke", "#2147d6");
+
+  await map.getByRole("button", { name: "Satellite" }).click();
+  await expect(tiles.first()).toHaveAttribute("src", /World_Imagery/);
+  await expect(credits).toContainText("Vantor");
+  await expect(route).toHaveAttribute("stroke", "#ffffff");
+});
+
+test("phone: map credits take one line until tapped", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const map = page.getByTestId("trip-map");
+  await map.getByRole("button", { name: "Map", exact: true }).click();
+  const credits = map.locator(".leaflet-control-attribution");
+  await expect(credits).toContainText("OpenStreetMap");
+  const oneLine = (await credits.boundingBox())!.height;
+  expect(oneLine).toBeLessThan(24);
+  await credits.click({ position: { x: 300, y: 8 } });
+  await expect.poll(async () => (await credits.boundingBox())!.height).toBeGreaterThan(oneLine * 2);
+});

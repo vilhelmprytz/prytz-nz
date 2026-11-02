@@ -1,0 +1,26 @@
+/* Placed by each map (see `className`): above the tiles, clear of Leaflet's zoom buttons and credits. */
+.toggle {
+  position: absolute;
+  z-index: 500;
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+.toggle button {
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font: 500 12px var(--body-font);
+  cursor: pointer;
+}
+
+.toggle button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}

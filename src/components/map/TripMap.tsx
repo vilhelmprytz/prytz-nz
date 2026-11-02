@@ -4,9 +4,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 import { unwrapLongitudes } from "@/geo/unwrap";
-import { SATELLITE_ATTRIBUTION, SATELLITE_TILES } from "@/geo/tiles";
+import { BASEMAPS } from "@/geo/tiles";
 import type { RoutePoint } from "@/posts/types";
 import styles from "./map.module.css";
+import { MapStyleToggle, useMapStyle } from "./MapStyleToggle";
 
 const FIT_PADDING: L.PointExpression = [50, 50];
 
@@ -34,6 +35,9 @@ export default function TripMap({
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<{ postId: string; marker: L.Marker }[]>([]);
+  const tiles = useRef<L.TileLayer | null>(null);
+  const line = useRef<L.Polyline | null>(null);
+  const [mapStyle, setMapStyle] = useMapStyle();
   const onSelectRef = useRef(onSelect);
 
   useEffect(() => {
@@ -55,14 +59,13 @@ export default function TripMap({
     const m = L.map(el, { zoomControl: false });
     map.current = m;
     L.control.zoom({ position: "bottomright" }).addTo(m);
-    L.tileLayer(SATELLITE_TILES, { attribution: SATELLITE_ATTRIBUTION, maxZoom: 18 }).addTo(m);
 
     // Unwrapped longitudes keep every hop on the short side of the globe (LA → NZ crosses the Pacific).
     const route = unwrapLongitudes(points);
     if (route.length >= 2) {
-      L.polyline(
+      line.current = L.polyline(
         route.map((p) => [p.lat, p.lng] as L.LatLngTuple),
-        { color: "#ffffff", weight: 3, opacity: 0.9, interactive: false },
+        { weight: 3, opacity: 0.9, interactive: false },
       ).addTo(m);
     }
     for (const p of route) {
@@ -82,9 +85,20 @@ export default function TripMap({
       m.remove();
       map.current = null;
       markers.current = [];
+      tiles.current = null;
+      line.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the route is fixed for the page's lifetime
   }, []);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const basemap = BASEMAPS[mapStyle];
+    tiles.current?.remove();
+    tiles.current = L.tileLayer(basemap.url, basemap.options).addTo(m);
+    line.current?.setStyle({ color: basemap.routeColor });
+  }, [mapStyle]);
 
   useEffect(() => {
     const m = map.current;
@@ -105,8 +119,9 @@ export default function TripMap({
   }, [activeId]);
 
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} data-map-style={mapStyle}>
       <div ref={container} className={styles.map} />
+      <MapStyleToggle value={mapStyle} onChange={setMapStyle} className={styles.styleToggle} />
       <div className={styles.controls}>
         <button type="button" onClick={fitAll}>
           Whole trip

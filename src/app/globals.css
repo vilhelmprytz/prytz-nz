@@ -35,3 +35,21 @@ input,
 textarea {
   font: inherit;
 }
+
+/* Map credits: one line, the full text on tap or hover (as Esri's own Leaflet library does). The bottom-right
+   corner spans the map so the credits can use its width; Leaflet keeps the corner itself click-through. */
+.leaflet-container .leaflet-bottom.leaflet-right {
+  left: 0;
+}
+
+.leaflet-container .leaflet-control-attribution {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.leaflet-container .leaflet-control-attribution:hover {
+  white-space: normal;
+}

@@ -9,6 +9,11 @@
   background: #1d2a24;
 }
 
+/* The street map loads light; don't flash the satellite's dark green behind it. */
+.wrap[data-map-style="map"] .map {
+  background: #f2efe9;
+}
+
 .controls {
   position: absolute;
   z-index: 500;
@@ -30,6 +35,12 @@
   font: 500 12px var(--body-font);
   cursor: pointer;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Under "Whole trip": the panel can be too narrow for three controls in a row. */
+.styleToggle {
+  top: 52px;
+  left: 14px;
 }
 
 .marker {

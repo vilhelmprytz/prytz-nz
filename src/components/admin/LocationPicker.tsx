@@ -3,7 +3,8 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
-import { SATELLITE_ATTRIBUTION, SATELLITE_TILES } from "@/geo/tiles";
+import { MapStyleToggle, useMapStyle } from "@/components/map/MapStyleToggle";
+import { BASEMAPS } from "@/geo/tiles";
 import type { LatLng } from "@/posts/types";
 import styles from "./editor.module.css";
 
@@ -31,6 +32,10 @@ export default function LocationPicker({
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
+  const tiles = useRef<L.TileLayer | null>(null);
+  const line = useRef<L.Polyline | null>(null);
+  const routeColor = useRef(BASEMAPS.satellite.routeColor);
+  const [mapStyle, setMapStyle] = useMapStyle();
   const latest = useRef({ points, onChange });
   const hadPoints = useRef(false);
   // Set when the change came from this map (tap, drag, remove): never reframe under the admin's finger.
@@ -51,7 +56,6 @@ export default function LocationPicker({
   useEffect(() => {
     if (!container.current) return;
     const m = L.map(container.current, { zoomControl: true, attributionControl: true }).setView([20, 0], 2);
-    L.tileLayer(SATELLITE_TILES, { attribution: SATELLITE_ATTRIBUTION, maxZoom: 18 }).addTo(m);
     m.on("click", (e: L.LeafletMouseEvent) => {
       const { points: current, onChange: change } = latest.current;
       change([...current, { lat: e.latlng.lat, lng: e.latlng.lng }], "pin");
@@ -62,20 +66,32 @@ export default function LocationPicker({
       m.remove();
       map.current = null;
       layer.current = null;
+      tiles.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const basemap = BASEMAPS[mapStyle];
+    tiles.current?.remove();
+    tiles.current = L.tileLayer(basemap.url, basemap.options).addTo(m);
+    routeColor.current = basemap.routeColor;
+    line.current?.setStyle({ color: basemap.routeColor });
+  }, [mapStyle]);
 
   useEffect(() => {
     const m = map.current;
     const group = layer.current;
     if (!m || !group) return;
     group.clearLayers();
-    if (points.length > 1) {
-      L.polyline(
-        points.map((p) => [p.lat, p.lng] as L.LatLngTuple),
-        { color: "#ffffff", weight: 3, opacity: 0.9, interactive: false },
-      ).addTo(group);
-    }
+    line.current =
+      points.length > 1
+        ? L.polyline(
+            points.map((p) => [p.lat, p.lng] as L.LatLngTuple),
+            { color: routeColor.current, weight: 3, opacity: 0.9, interactive: false },
+          ).addTo(group)
+        : null;
     points.forEach((p, i) => {
       const marker = L.marker([p.lat, p.lng], { draggable: true, icon: pointIcon(i + 1) }).addTo(group);
       marker.on("click", () => {
@@ -131,8 +147,12 @@ export default function LocationPicker({
   }
 
   return (
-    <div className={styles.locationPicker}>
-      <div ref={container} className={styles.map} data-testid="location-map" />
+    <div className={styles.locationPicker} data-testid="location-picker">
+      {/* The toggle sits beside the map, not inside it, so tapping it never drops a pin. */}
+      <div className={styles.mapFrame}>
+        <div ref={container} className={styles.map} data-testid="location-map" />
+        <MapStyleToggle value={mapStyle} onChange={setMapStyle} className={styles.mapStyleToggle} />
+      </div>
       <p className={styles.hint}>Tap the map to add a place. For a travel day, tap each stop in order.</p>
       <button type="button" className={styles.secondaryButton} onClick={useCurrentLocation} disabled={locating}>
         {locating ? "Finding you…" : "Use my current location"}

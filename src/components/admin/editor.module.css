@@ -215,6 +215,16 @@
   gap: 10px;
 }
 
+.mapFrame {
+  position: relative;
+}
+
+/* Top-right: Leaflet's zoom buttons are top-left and its credits bottom-right. */
+.mapStyleToggle {
+  top: 10px;
+  right: 10px;
+}
+
 .map {
   height: 260px;
   border-radius: 8px;
