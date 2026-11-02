@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ADMIN_STATE } from "./env";
-import { makeJpeg } from "./fixtures";
+import { makeClip, makeJpeg } from "./fixtures";
 
 test.use({ storageState: ADMIN_STATE, viewport: { width: 390, height: 844 } });
 
@@ -173,4 +173,105 @@ test("photos keep the order they were picked in, and dragging reorders them", as
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page).toHaveURL("/admin");
+});
+
+async function publishCurrent(page: Page, title: string) {
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Date").fill("2026-10-19T09:00");
+  await page.getByTestId("location-map").click({ position: { x: 100, y: 100 } });
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page.getByRole("button", { name: "Unpublish" })).toBeVisible();
+}
+
+async function deleteCurrent(page: Page) {
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page).toHaveURL("/admin");
+}
+
+test("a clip uploads next to photos, never takes the headline, and is served in ranges", async ({ page }) => {
+  test.setTimeout(120_000);
+  await newPost(page);
+  const clip = await makeClip(page, { seconds: 2, width: 1280, height: 720 });
+  await page.getByLabel("Add photos").setInputFiles([
+    { name: "clip.mp4", mimeType: "video/mp4", buffer: clip },
+    jpeg("p.jpg", await makeJpeg(page, {})),
+  ]);
+  const tiles = page.getByTestId("photo-tile");
+  await expect(tiles.filter({ hasText: "Done" })).toHaveCount(2, { timeout: 60_000 });
+  const clipTile = page.locator('[data-testid="photo-tile"][data-kind="video"]');
+  await expect(clipTile).toHaveCount(1);
+  await expect(clipTile.getByRole("button", { name: "Headline" })).toHaveCount(0);
+  await expect(page.locator('[data-testid="photo-tile"][data-kind="photo"]').getByRole("button", { name: "Headline" }))
+    .toHaveAttribute("aria-pressed", "true");
+  const clipId = await clipTile.getAttribute("data-photo-id");
+  await publishCurrent(page, "Clip day");
+
+  const full = await page.request.get(`/photos/${clipId}/video`);
+  expect(full.status()).toBe(200);
+  expect(full.headers()["content-type"]).toBe("video/mp4");
+  const part = await page.request.get(`/photos/${clipId}/video`, { headers: { Range: "bytes=0-99" } });
+  expect(part.status()).toBe(206);
+  expect((await part.body()).length).toBe(100);
+  await deleteCurrent(page);
+});
+
+test("Retry after a failed clip upload doesn't compress again", async ({ page }) => {
+  test.setTimeout(120_000);
+  await newPost(page);
+  const clip = await makeClip(page, { seconds: 1, width: 640, height: 360 });
+  await page.route("**/api/dev-storage/**/video.mp4", (route) => route.abort());
+  await page.getByLabel("Add photos").setInputFiles([{ name: "clip.mp4", mimeType: "video/mp4", buffer: clip }]);
+  const tile = page.locator('[data-testid="photo-tile"][data-kind="video"]');
+  await expect(tile.getByRole("button", { name: "Retry" })).toBeVisible({ timeout: 60_000 });
+  await page.unroute("**/api/dev-storage/**/video.mp4");
+
+  // Record every text the tile shows from here on.
+  await tile.evaluate((el) => {
+    const seen: string[] = [];
+    (window as unknown as { seen: string[] }).seen = seen;
+    new MutationObserver(() => seen.push(el.textContent ?? "")).observe(el, { subtree: true, childList: true, characterData: true });
+  });
+  await tile.getByRole("button", { name: "Retry" }).click();
+  await expect(tile).toContainText("Done", { timeout: 60_000 });
+  const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen);
+  expect(seen.some((t) => t.includes("Compressing"))).toBe(false);
+  await deleteCurrent(page);
+});
+
+test("the screen wake lock is released once every clip is done", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => {
+    const w = window as unknown as { locks: { released: boolean }[] };
+    w.locks = [];
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: {
+        request: async () => {
+          const lock = {
+            released: false,
+            release: async () => {
+              lock.released = true;
+            },
+          };
+          w.locks.push(lock);
+          return lock;
+        },
+      },
+    });
+  });
+  await newPost(page);
+  const a = await makeClip(page, { seconds: 1, width: 640, height: 360 });
+  const b = await makeClip(page, { seconds: 1, width: 640, height: 360 });
+  await page.getByLabel("Add photos").setInputFiles([
+    { name: "a.mp4", mimeType: "video/mp4", buffer: a },
+    { name: "b.mp4", mimeType: "video/mp4", buffer: b },
+  ]);
+  await expect(page.getByTestId("photo-tile").filter({ hasText: "Done" })).toHaveCount(2, { timeout: 60_000 });
+  const held = () =>
+    page.evaluate(() => (window as unknown as { locks: { released: boolean }[] }).locks.filter((l) => !l.released).length);
+  await expect.poll(held).toBe(0);
+  expect(await page.evaluate(() => (window as unknown as { locks: unknown[] }).locks.length)).toBeGreaterThan(0);
+  await deleteCurrent(page);
 });

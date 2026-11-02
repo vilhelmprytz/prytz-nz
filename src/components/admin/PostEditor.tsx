@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pickPostDefaults } from "@/client/post-defaults";
-import { uploadPhoto, type UploadStage } from "@/client/upload";
+import { uploadClip, uploadPhoto, type UploadStage } from "@/client/upload";
 import { deletePostAction, publishAction, removePhotoAction, savePostAction, unpublishAction } from "@/posts/actions";
 import type { EditablePhoto, EditablePost, LatLng, PostFieldsInput } from "@/posts/types";
 import type { LocationSource } from "./LocationPicker";
@@ -61,7 +61,9 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     location: initial.points.length > 0,
     place: initial.placeName !== "",
     // A saved headline other than the first photo must have been starred.
-    headline: initial.headlinePhotoId !== null && initial.headlinePhotoId !== initial.photos[0]?.id,
+    headline:
+      initial.headlinePhotoId !== null &&
+      initial.headlinePhotoId !== initial.photos.find((p) => p.kind === "photo")?.id,
   });
 
   /** Finished photos in tray order: the order the site shows them in. */
@@ -115,13 +117,20 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
   const queue = useRef<TrayItem[]>([]);
   const active = useRef(0);
   const pumpRef = useRef<() => void>(() => {});
+  // Clips compress one at a time (the heavy part); photos keep their own two upload slots.
+  const clipQueue = useRef<TrayItem[]>([]);
+  const clipActive = useRef(false);
+  const pumpClipsRef = useRef<() => void>(() => {});
+  const wakeLock = useRef<WakeLockSentinel | null>(null);
+  const wakeLockPending = useRef(false);
 
   const setStage = (key: string, stage: UploadStage, photo?: TrayItem["photo"]) =>
     setItems((list) => list.map((i) => (i.key === key ? { ...i, stage, photo: photo ?? i.photo } : i)));
 
   /** After the photo order changes: unless a headline was starred, the first photo leads. Then save. */
   const orderChanged = useCallback(() => {
-    const first = orderedPhotos()[0]?.id ?? null;
+    // Only a photo can lead the post; clips are skipped.
+    const first = orderedPhotos().find((p) => p.kind === "photo")?.id ?? null;
     update(byHand.current.headline ? {} : { headlinePhotoId: first });
   }, [update, orderedPhotos]);
 
@@ -150,6 +159,10 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     if (Object.keys(patch).length > 0) update(patch);
   }, [update, orderedPhotos]);
 
+  /** Nothing uploading or compressing: photo date and location defaults can be applied. */
+  const settled = () =>
+    active.current === 0 && queue.current.length === 0 && !clipActive.current && clipQueue.current.length === 0;
+
   const pump = useCallback(() => {
     while (active.current < CONCURRENT_UPLOADS && queue.current.length > 0) {
       const item = queue.current.shift()!;
@@ -164,7 +177,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
         .catch(() => {})
         .finally(() => {
           active.current--;
-          if (active.current === 0 && queue.current.length === 0) applyPhotoDefaults();
+          if (settled()) applyPhotoDefaults();
           pumpRef.current();
         });
     }
@@ -174,27 +187,89 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
     pumpRef.current = pump;
   }, [pump]);
 
+  const clipsIdle = useCallback(() => !clipActive.current && clipQueue.current.length === 0, []);
+
+  /** Keep the screen on while clips compress: one lock at a time, never left behind. The browser may refuse. */
+  const holdWakeLock = useCallback(() => {
+    if ((wakeLock.current && !wakeLock.current.released) || wakeLockPending.current || !navigator.wakeLock) return;
+    wakeLockPending.current = true;
+    navigator.wakeLock
+      .request("screen")
+      .then((lock) => {
+        // The clips may have finished (or failed) before the lock arrived.
+        if (clipsIdle()) void lock.release().catch(() => {});
+        else wakeLock.current = lock;
+      })
+      .catch(() => {})
+      .finally(() => {
+        wakeLockPending.current = false;
+      });
+  }, [clipsIdle]);
+
+  const releaseWakeLock = useCallback(() => {
+    const lock = wakeLock.current;
+    wakeLock.current = null;
+    void lock?.release().catch(() => {});
+  }, []);
+
+  const pumpClips = useCallback(() => {
+    if (clipActive.current || clipQueue.current.length === 0) return;
+    const item = clipQueue.current.shift()!;
+    clipActive.current = true;
+    holdWakeLock();
+    // Clip dates are UTC; convert them with the post's photos' offset when there is one.
+    const offsetHint = orderedPhotos().find((p) => p.utcOffset)?.utcOffset ?? null;
+    uploadClip(item.file!, postId, offsetHint, (stage) => setStage(item.key, stage), item.kept)
+      .then((clip) => {
+        photoByKey.current.set(item.key, clip);
+        setStage(item.key, { kind: "done" }, clip);
+        orderChanged();
+      })
+      .catch(() => {})
+      .finally(() => {
+        clipActive.current = false;
+        if (clipsIdle()) releaseWakeLock();
+        if (settled()) applyPhotoDefaults();
+        pumpClipsRef.current();
+      });
+  }, [postId, applyPhotoDefaults, orderChanged, orderedPhotos, clipsIdle, holdWakeLock, releaseWakeLock]);
+
+  useEffect(() => {
+    pumpClipsRef.current = pumpClips;
+  }, [pumpClips]);
+
   function addFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const added = Array.from(files).map(
-      (file): TrayItem => ({
+    const added = Array.from(files).map((file): TrayItem => {
+      const isClip = file.type.startsWith("video/");
+      return {
         key: `upload-${nextKey++}`,
         file,
-        preview: URL.createObjectURL(file),
+        // A clip has no image to preview until its poster frame is uploaded.
+        preview: isClip ? undefined : URL.createObjectURL(file),
         stage: { kind: "reading" },
-      }),
-    );
+        ...(isClip ? { clip: true, kept: {} } : {}),
+      };
+    });
     setItems((list) => [...list, ...added]);
     orderRef.current = [...orderRef.current, ...added.map((i) => i.key)];
-    queue.current.push(...added);
+    queue.current.push(...added.filter((i) => !i.clip));
+    clipQueue.current.push(...added.filter((i) => i.clip));
     pump();
+    pumpClips();
   }
 
   function retry(item: TrayItem) {
+    // A clip keeps its compressed file in `kept`, so Retry only re-uploads it.
     const again = { ...item, stage: { kind: "reading" } as UploadStage };
     setItems((list) => list.map((i) => (i.key === item.key ? again : i)));
-    queue.current.push(again);
-    pump();
+    if (again.clip) {
+      clipQueue.current.push(again);
+      pumpClips();
+    } else {
+      queue.current.push(again);
+      pump();
+    }
   }
 
   async function remove(item: TrayItem) {
@@ -280,7 +355,7 @@ export function PostEditor({ initial }: { initial: EditablePost }) {
           Add photos
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple
             className={styles.visuallyHidden}
             onChange={(e) => {

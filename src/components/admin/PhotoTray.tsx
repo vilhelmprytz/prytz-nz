@@ -13,11 +13,20 @@ import {
 } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { UploadStage } from "@/client/upload";
+import type { KeptClip, UploadStage } from "@/client/upload";
 import type { EditablePhoto } from "@/posts/types";
 import styles from "./editor.module.css";
 
-export type TrayItem = { key: string; file?: File; preview?: string; stage: UploadStage; photo?: EditablePhoto };
+export type TrayItem = {
+  key: string;
+  file?: File;
+  preview?: string;
+  stage: UploadStage;
+  photo?: EditablePhoto;
+  /** A video clip: no ★, compressed on the phone, and its compressed file kept for Retry. */
+  clip?: boolean;
+  kept?: KeptClip;
+};
 
 function stageLabel(stage: UploadStage): string {
   switch (stage.kind) {
@@ -25,6 +34,8 @@ function stageLabel(stage: UploadStage): string {
       return "Reading…";
     case "resizing":
       return "Resizing…";
+    case "compressing":
+      return `Compressing ${stage.pct}%`;
     case "uploading":
       return `Uploading ${stage.pct}%`;
     case "finishing":
@@ -46,11 +57,14 @@ function Tile({ item, isHeadline, onHeadline, onRemove, onRetry }: { item: TrayI
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: item.key,
   });
+  const isClip = item.clip === true || item.photo?.kind === "video";
+  const image = item.photo?.thumbUrl ?? item.preview;
   return (
     <li
       ref={setNodeRef}
       data-testid="photo-tile"
       data-photo-id={item.photo?.id}
+      data-kind={isClip ? "video" : "photo"}
       data-width={item.photo?.width}
       data-height={item.photo?.height}
       className={isHeadline ? styles.tileHeadline : styles.tile}
@@ -70,10 +84,22 @@ function Tile({ item, isHeadline, onHeadline, onRemove, onRetry }: { item: TrayI
         aria-label="Drag to reorder"
         onContextMenu={(e) => e.preventDefault()}
       >
-        <img src={item.photo?.thumbUrl ?? item.preview} alt="" className={styles.tileImage} draggable={false} />
+        {image ? (
+          <img src={image} alt="" className={styles.tileImage} draggable={false} />
+        ) : (
+          <div className={styles.tileClipPlaceholder} aria-hidden="true" />
+        )}
+        {isClip && (
+          <span className={styles.tilePlay} aria-hidden="true">
+            ▶
+          </span>
+        )}
       </div>
       <div className={styles.tileBar}>
-        <span className={item.stage.kind === "failed" ? styles.tileError : styles.tileStage}>{stageLabel(item.stage)}</span>
+        <span className={item.stage.kind === "failed" ? styles.tileError : styles.tileStage}>
+          {stageLabel(item.stage)}
+          {item.stage.kind === "compressing" && <small className={styles.tileNote}>Keep this page open</small>}
+        </span>
         {item.stage.kind === "failed" && item.file && (
           <button type="button" className={styles.tileButton} onClick={() => onRetry(item)}>
             Retry
@@ -81,6 +107,7 @@ function Tile({ item, isHeadline, onHeadline, onRemove, onRetry }: { item: TrayI
         )}
         {item.photo && (
           <>
+            {!isClip && (
             <button
               type="button"
               aria-label="Headline"
@@ -91,6 +118,7 @@ function Tile({ item, isHeadline, onHeadline, onRemove, onRetry }: { item: TrayI
             >
               ★
             </button>
+            )}
             <button type="button" className={styles.tileButton} onClick={() => onRemove(item)}>
               Remove
             </button>

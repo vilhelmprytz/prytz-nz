@@ -80,6 +80,7 @@
 }
 
 .dragHandle {
+  position: relative;
   cursor: grab;
   /* Allow scrolling past the photos; the touch drag only starts after a short hold. */
   touch-action: manipulation;
@@ -89,6 +90,33 @@
 
 .dragHandle:active {
   cursor: grabbing;
+}
+
+.tileClipPlaceholder {
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(135deg, #2b3a4a, #5a6d80);
+}
+
+.tilePlay {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.tileNote {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .tileImage {
