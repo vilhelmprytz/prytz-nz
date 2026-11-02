@@ -28,3 +28,11 @@ test("rejects keys escaping the dir", async () => {
 test("presignPut points at the dev upload route", async () => {
   expect(await s.presignPut("photos/1/display.webp", "image/webp")).toBe("/api/dev-storage/photos/1/display.webp");
 });
+
+test("get with a range returns just those bytes and the full size", async () => {
+  await s.put("r.mp4", new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), "video/mp4");
+  const obj = await s.get("r.mp4", { start: 2, end: 4 });
+  expect(obj?.size).toBe(10);
+  expect(obj?.range).toEqual({ start: 2, end: 4 });
+  expect(new Uint8Array(await new Response(obj!.body).arrayBuffer())).toEqual(new Uint8Array([2, 3, 4]));
+});

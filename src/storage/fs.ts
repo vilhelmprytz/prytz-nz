@@ -32,11 +32,12 @@ export function createFsStorage(dir: string): Storage & {
       return `/api/dev-storage/${key}`;
     },
     head,
-    async get(key) {
+    async get(key, range) {
       const info = await head(key);
       if (!info) return null;
-      const body = Readable.toWeb(createReadStream(fileFor(key))) as ReadableStream<Uint8Array>;
-      return { body, ...info };
+      const stream = createReadStream(fileFor(key), range ? { start: range.start, end: range.end } : undefined);
+      const body = Readable.toWeb(stream) as ReadableStream<Uint8Array>;
+      return { body, ...info, ...(range ? { range } : {}) };
     },
     async delete(keys) {
       await Promise.all(keys.flatMap((k) => [rm(fileFor(k), { force: true }), rm(metaFor(fileFor(k)), { force: true })]));

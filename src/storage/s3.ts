@@ -44,14 +44,19 @@ export function createS3Storage(cfg: {
         throw e;
       }
     },
-    async get(key) {
+    async get(key, range) {
       try {
-        const res = await client.send(new GetObjectCommand({ Bucket, Key: key }));
+        const res = await client.send(
+          new GetObjectCommand({ Bucket, Key: key, Range: range ? `bytes=${range.start}-${range.end}` : undefined }),
+        );
         if (!res.Body) return null;
+        // With a range, ContentLength is the slice; the full size is after the slash in Content-Range.
+        const total = range ? Number(res.ContentRange?.split("/")[1]) : res.ContentLength;
         return {
           body: res.Body.transformToWebStream() as ReadableStream<Uint8Array>,
-          size: res.ContentLength ?? 0,
+          size: total ?? 0,
           contentType: res.ContentType ?? "application/octet-stream",
+          ...(range ? { range } : {}),
         };
       } catch (e) {
         if (isMissing(e)) return null;
