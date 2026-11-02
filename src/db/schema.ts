@@ -52,6 +52,7 @@ export const photos = pgTable(
       .references(() => posts.id, { onDelete: "cascade" }),
     displayKey: text("display_key").notNull(),
     thumbKey: text("thumb_key").notNull(),
+    kind: text("kind", { enum: ["photo", "video"] }).notNull().default("photo"),
     contentType: text("content_type").notNull(),
     width: integer("width").notNull(),
     height: integer("height").notNull(),
@@ -61,6 +62,10 @@ export const photos = pgTable(
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
     status: text("status", { enum: ["pending", "ready"] }).notNull().default("pending"),
+    // Clips only: the compressed MP4. The poster frame uses display_key/thumb_key like a photo.
+    videoKey: text("video_key"),
+    videoContentType: text("video_content_type"),
+    durationMs: integer("duration_ms"),
     createdAt: createdAt(),
   },
   (t) => [index("photos_post_id_idx").on(t.postId)],

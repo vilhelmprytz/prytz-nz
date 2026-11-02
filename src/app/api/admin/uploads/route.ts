@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   const [post] = await db.select({ id: posts.id }).from(posts).where(eq(posts.id, parsed.data.postId));
   if (!post) return Response.json({ error: "Post not found" }, { status: 404 });
 
-  const { photoId, displayKey, thumbKey } = await createPendingPhoto(db, post.id, parsed.data.meta);
+  const { photoId, displayKey, thumbKey } = await createPendingPhoto(db, post.id, { ...parsed.data.meta, kind: "photo" });
   const storage = getStorage();
   const [displayPutUrl, thumbPutUrl] = await Promise.all([
     storage.presignPut(displayKey, parsed.data.meta.contentType),

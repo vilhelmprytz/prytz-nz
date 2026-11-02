@@ -2,10 +2,27 @@ export type LatLng = { lat: number; lng: number };
 
 export type PhotoMeta = { takenAtLocal: string | null; utcOffset: string | null; lat: number | null; lng: number | null };
 
-export type PhotoView = { id: string; width: number; height: number; displayUrl: string; thumbUrl: string };
+export type MediaKind = "photo" | "video";
+
+/** A photo, or a clip (its poster frame in displayUrl/thumbUrl, the MP4 at videoUrl). */
+export type PhotoView = {
+  id: string;
+  kind: MediaKind;
+  width: number;
+  height: number;
+  displayUrl: string;
+  thumbUrl: string;
+  videoUrl?: string;
+  durationMs?: number;
+};
 export type EditablePhoto = PhotoView & PhotoMeta;
 
-export type UploadMeta = PhotoMeta & { width: number; height: number; contentType: "image/webp" | "image/jpeg" };
+export type UploadMeta = PhotoMeta & {
+  width: number;
+  height: number;
+  /** For a clip, the poster images' type. */
+  contentType: "image/webp" | "image/jpeg";
+} & ({ kind: "photo" } | { kind: "video"; durationMs: number; videoContentType: "video/mp4" });
 
 export type PostStatus = "draft" | "published";
 

@@ -19,6 +19,7 @@ import type {
 
 export const MAX_DISPLAY_BYTES = 15 * 1024 * 1024;
 export const MAX_THUMB_BYTES = 2 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 150 * 1024 * 1024;
 const STALE_PENDING_MS = 24 * 3600_000;
 
 /** Postgres returns `2026-10-24 10:00:00`; the app speaks `2026-10-24T10:00:00`. */
@@ -26,13 +27,18 @@ const isoLocal = (value: string | null) => (value ? value.replace(" ", "T").slic
 
 type PhotoRow = typeof photos.$inferSelect;
 
-const photoView = (p: Pick<PhotoRow, "id" | "width" | "height">): PhotoView => ({
+const photoView = (p: Pick<PhotoRow, "id" | "kind" | "width" | "height" | "durationMs">): PhotoView => ({
   id: p.id,
+  kind: p.kind,
   width: p.width,
   height: p.height,
   displayUrl: `/photos/${p.id}/display`,
   thumbUrl: `/photos/${p.id}/thumb`,
+  ...(p.kind === "video" ? { videoUrl: `/photos/${p.id}/video`, durationMs: p.durationMs ?? 0 } : {}),
 });
+
+/** Only photos can lead a post. */
+const isPhoto = (p: { kind: "photo" | "video" }) => p.kind === "photo";
 
 const editablePhoto = (p: PhotoRow): EditablePhoto => ({
   ...photoView(p),
@@ -85,7 +91,9 @@ export async function getPostForEdit(db: Db, id: string): Promise<EditablePost |
 }
 
 export async function savePostFields(db: Db, id: string, input: PostFieldsInput): Promise<void> {
-  const owned = new Set((await readyPhotosOf(db, [id])).map((p) => p.id));
+  const ready = await readyPhotosOf(db, [id]);
+  const owned = new Set(ready.map((p) => p.id));
+  const ownedPhotos = new Set(ready.filter(isPhoto).map((p) => p.id));
   await db
     .update(posts)
     .set({
@@ -94,7 +102,7 @@ export async function savePostFields(db: Db, id: string, input: PostFieldsInput)
       placeName: input.placeName,
       takenAtLocal: input.takenAtLocal,
       utcOffset: input.utcOffset,
-      headlinePhotoId: input.headlinePhotoId && owned.has(input.headlinePhotoId) ? input.headlinePhotoId : null,
+      headlinePhotoId: input.headlinePhotoId && ownedPhotos.has(input.headlinePhotoId) ? input.headlinePhotoId : null,
       updatedAt: new Date(),
     })
     .where(eq(posts.id, id));
@@ -113,7 +121,7 @@ export async function savePostFields(db: Db, id: string, input: PostFieldsInput)
 export function validateForPublish(post: EditablePost): string[] {
   const errors: string[] = [];
   if (!post.title.trim()) errors.push("Add a title");
-  if (!post.headlinePhotoId || !post.photos.some((p) => p.id === post.headlinePhotoId)) {
+  if (!post.headlinePhotoId || !post.photos.some((p) => p.id === post.headlinePhotoId && isPhoto(p))) {
     errors.push("Choose a headline photo");
   }
   if (post.points.length === 0) errors.push("Set a location");
@@ -145,8 +153,11 @@ export async function setPublished(
 }
 
 export async function deletePost(db: Db, storage: Storage, id: string): Promise<void> {
-  const rows = await db.select({ d: photos.displayKey, t: photos.thumbKey }).from(photos).where(eq(photos.postId, id));
-  await storage.delete(rows.flatMap((r) => [r.d, r.t]));
+  const rows = await db
+    .select({ d: photos.displayKey, t: photos.thumbKey, v: photos.videoKey })
+    .from(photos)
+    .where(eq(photos.postId, id));
+  await storage.delete(rows.flatMap((r) => (r.v ? [r.d, r.t, r.v] : [r.d, r.t])));
   await db.delete(posts).where(eq(posts.id, id));
 }
 
@@ -172,17 +183,22 @@ export async function createPendingPhoto(
   db: Db,
   postId: string,
   meta: UploadMeta,
-): Promise<{ photoId: string; displayKey: string; thumbKey: string }> {
+): Promise<{ photoId: string; displayKey: string; thumbKey: string; videoKey: string | null }> {
   const photoId = randomUUID();
   const ext = meta.contentType === "image/webp" ? "webp" : "jpg";
   const displayKey = `photos/${photoId}/display.${ext}`;
   const thumbKey = `photos/${photoId}/thumb.${ext}`;
+  const videoKey = meta.kind === "video" ? `photos/${photoId}/video.mp4` : null;
   await db.insert(photos).values({
     id: photoId,
     postId,
     displayKey,
     thumbKey,
+    kind: meta.kind,
     contentType: meta.contentType,
+    videoKey,
+    videoContentType: meta.kind === "video" ? meta.videoContentType : null,
+    durationMs: meta.kind === "video" ? meta.durationMs : null,
     width: meta.width,
     height: meta.height,
     takenAtLocal: meta.takenAtLocal,
@@ -190,11 +206,11 @@ export async function createPendingPhoto(
     lat: meta.lat,
     lng: meta.lng,
   });
-  return { photoId, displayKey, thumbKey };
+  return { photoId, displayKey, thumbKey, videoKey };
 }
 
 async function discardPhoto(db: Db, storage: Storage, photo: PhotoRow): Promise<void> {
-  await storage.delete([photo.displayKey, photo.thumbKey]);
+  await storage.delete(photo.videoKey ? [photo.displayKey, photo.thumbKey, photo.videoKey] : [photo.displayKey, photo.thumbKey]);
   await db.delete(photos).where(eq(photos.id, photo.id));
 }
 
@@ -207,12 +223,19 @@ export async function completePhoto(
   const [photo] = await db.select().from(photos).where(eq(photos.id, photoId));
   if (!photo || photo.status !== "pending") return { ok: false, reason: "Upload not found" };
 
-  const [display, thumb] = await Promise.all([storage.head(photo.displayKey), storage.head(photo.thumbKey)]);
-  const reason = !display || !thumb
+  const [display, thumb, video] = await Promise.all([
+    storage.head(photo.displayKey),
+    storage.head(photo.thumbKey),
+    photo.videoKey ? storage.head(photo.videoKey) : Promise.resolve(null),
+  ]);
+  const isClip = photo.kind === "video";
+  const reason = !display || !thumb || (isClip && !video)
     ? "Upload missing"
-    : display.contentType !== photo.contentType || thumb.contentType !== photo.contentType
+    : display.contentType !== photo.contentType ||
+        thumb.contentType !== photo.contentType ||
+        (isClip && video!.contentType !== photo.videoContentType)
       ? "Wrong file type"
-      : display.size > MAX_DISPLAY_BYTES || thumb.size > MAX_THUMB_BYTES
+      : display.size > MAX_DISPLAY_BYTES || thumb.size > MAX_THUMB_BYTES || (isClip && video!.size > MAX_VIDEO_BYTES)
         ? "File too large"
         : null;
   if (reason) {
@@ -229,10 +252,12 @@ export async function completePhoto(
     .set({ status: "ready", sortOrder: last === null ? 0 : last + 1 })
     .where(eq(photos.id, photoId))
     .returning();
-  await db
-    .update(posts)
-    .set({ headlinePhotoId: sql`coalesce(${posts.headlinePhotoId}, ${photoId}::uuid)`, updatedAt: new Date() })
-    .where(eq(posts.id, photo.postId));
+  if (isPhoto(photo)) {
+    await db
+      .update(posts)
+      .set({ headlinePhotoId: sql`coalesce(${posts.headlinePhotoId}, ${photoId}::uuid)`, updatedAt: new Date() })
+      .where(eq(posts.id, photo.postId));
+  }
   return { ok: true, photo: editablePhoto(ready) };
 }
 
@@ -242,7 +267,7 @@ export async function removePhoto(db: Db, storage: Storage, photoId: string): Pr
   await discardPhoto(db, storage, photo);
   const [post] = await db.select({ headline: posts.headlinePhotoId }).from(posts).where(eq(posts.id, photo.postId));
   if (post?.headline === photoId) {
-    const [next] = await readyPhotosOf(db, [photo.postId]);
+    const next = (await readyPhotosOf(db, [photo.postId])).find(isPhoto);
     await db.update(posts).set({ headlinePhotoId: next?.id ?? null }).where(eq(posts.id, photo.postId));
   }
 }
@@ -330,7 +355,7 @@ export async function listFeedPage(
   const feedPosts: FeedPost[] = [];
   for (const r of pageRows) {
     const own = photoRows.filter((p) => p.postId === r.id);
-    const headline = own.find((p) => p.id === r.headlinePhotoId) ?? own[0];
+    const headline = own.find((p) => p.id === r.headlinePhotoId && isPhoto(p)) ?? own.find(isPhoto);
     if (!headline || !r.takenAtLocal) continue;
     feedPosts.push({
       id: r.id,

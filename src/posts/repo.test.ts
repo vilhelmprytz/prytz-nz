@@ -25,7 +25,16 @@ import {
 let db: Db;
 let storage: ReturnType<typeof createFsStorage>;
 const NOW = new Date("2026-11-02T12:00:00Z");
-const meta = { takenAtLocal: null, utcOffset: null, lat: null, lng: null, width: 4, height: 3, contentType: "image/webp" as const };
+const meta = {
+  kind: "photo" as const,
+  takenAtLocal: null,
+  utcOffset: null,
+  lat: null,
+  lng: null,
+  width: 4,
+  height: 3,
+  contentType: "image/webp" as const,
+};
 
 beforeEach(async () => {
   db = await createTestDb();
@@ -37,6 +46,28 @@ async function uploadPhoto(postId: string, opts: { displayBytes?: number; conten
   await storage.put(p.displayKey, new Uint8Array(opts.displayBytes ?? 10), opts.contentType ?? "image/webp");
   await storage.put(p.thumbKey, new Uint8Array(5), opts.contentType ?? "image/webp");
   return p;
+}
+
+async function uploadClip(postId: string, opts: { videoBytes?: number; videoType?: string; skipVideo?: boolean } = {}) {
+  const p = await createPendingPhoto(db, postId, {
+    ...meta,
+    kind: "video",
+    durationMs: 8000,
+    videoContentType: "video/mp4",
+  });
+  await storage.put(p.displayKey, new Uint8Array(10), "image/webp");
+  await storage.put(p.thumbKey, new Uint8Array(5), "image/webp");
+  if (!opts.skipVideo) {
+    await storage.put(p.videoKey!, new Uint8Array(opts.videoBytes ?? 20), opts.videoType ?? "video/mp4");
+  }
+  return p;
+}
+
+async function readyClip(postId: string) {
+  const p = await uploadClip(postId);
+  const r = await completePhoto(db, storage, p.photoId);
+  if (!r.ok) throw new Error(r.reason);
+  return r.photo;
 }
 
 async function readyPhoto(postId: string) {
@@ -243,4 +274,83 @@ test("savePostFields reorders photos; admin list shows drafts first then newest"
     ["T", "draft", 2],
     ["Pub", "published", 1],
   ]);
+});
+
+test("a clip never becomes the headline, even when it finishes first", async () => {
+  const postId = await createDraft(db);
+  const clip = await readyClip(postId);
+  expect((await getPostForEdit(db, postId))!.headlinePhotoId).toBeNull();
+  const photo = await readyPhoto(postId);
+  expect((await getPostForEdit(db, postId))!.headlinePhotoId).toBe(photo.id);
+  expect(clip.kind).toBe("video");
+  expect(clip.videoUrl).toBe(`/photos/${clip.id}/video`);
+  expect(clip.durationMs).toBe(8000);
+  expect(photo.kind).toBe("photo");
+  expect(photo.videoUrl).toBeUndefined();
+});
+
+test("a post with only clips can't be published", async () => {
+  const postId = await createDraft(db);
+  await readyClip(postId);
+  const res = await setPublished(db, postId, true, NOW);
+  expect(res.ok).toBe(false);
+  expect(res.ok ? [] : res.errors).toContain("Choose a headline photo");
+});
+
+test("removing the headline picks the next photo, skipping clips", async () => {
+  const postId = await createDraft(db);
+  const a = await readyPhoto(postId);
+  await readyClip(postId);
+  const b = await readyPhoto(postId);
+  await removePhoto(db, storage, a.id);
+  expect((await getPostForEdit(db, postId))!.headlinePhotoId).toBe(b.id);
+});
+
+test("feed headline falls back to the first photo, and clips stay in the list", async () => {
+  const id = await createDraft(db);
+  const clip = await readyClip(id);
+  const photo = await readyPhoto(id);
+  const post = (await getPostForEdit(db, id))!;
+  await savePostFields(db, id, {
+    title: "Mixed",
+    description: "",
+    placeName: "",
+    points: [{ lat: 1, lng: 2 }],
+    takenAtLocal: "2026-10-20T10:00:00",
+    utcOffset: null,
+    headlinePhotoId: post.headlinePhotoId,
+    photoOrder: [clip.id, photo.id],
+  });
+  expect((await setPublished(db, id, true, NOW)).ok).toBe(true);
+  // Even if the stored headline were missing, the feed must not fall back to the clip.
+  await db.update(posts).set({ headlinePhotoId: null }).where(eq(posts.id, id));
+  const [feedPost] = (await listFeedPage(db, { limit: 8 })).posts;
+  expect(feedPost.headline.id).toBe(photo.id);
+  expect(feedPost.photos.map((p) => [p.id, p.kind])).toEqual([[clip.id, "video"]]);
+});
+
+test("clip completion checks the video object: missing, wrong type, too large", async () => {
+  const postId = await createDraft(db);
+  const missing = await uploadClip(postId, { skipVideo: true });
+  expect(await completePhoto(db, storage, missing.photoId)).toEqual({ ok: false, reason: "Upload missing" });
+  const wrong = await uploadClip(postId, { videoType: "image/webp" });
+  expect(await completePhoto(db, storage, wrong.photoId)).toEqual({ ok: false, reason: "Wrong file type" });
+  const big = await uploadClip(postId, { videoBytes: 151 * 1024 * 1024 });
+  expect(await completePhoto(db, storage, big.photoId)).toEqual({ ok: false, reason: "File too large" });
+  expect(await storage.head(big.videoKey!)).toBeNull();
+  expect(await db.select().from(photos).where(eq(photos.postId, postId))).toHaveLength(0);
+});
+
+test("deleting a post or a stale upload removes the video object too", async () => {
+  const postId = await createDraft(db);
+  const clip = await uploadClip(postId);
+  await completePhoto(db, storage, clip.photoId);
+  await deletePost(db, storage, postId);
+  expect(await storage.head(clip.videoKey!)).toBeNull();
+
+  const other = await createDraft(db);
+  const stale = await uploadClip(other);
+  await db.update(photos).set({ createdAt: new Date(NOW.getTime() - 25 * 3600_000) }).where(eq(photos.id, stale.photoId));
+  expect(await cleanupStalePhotos(db, storage, NOW)).toBe(1);
+  expect(await storage.head(stale.videoKey!)).toBeNull();
 });

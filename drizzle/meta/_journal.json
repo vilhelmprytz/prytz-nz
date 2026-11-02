@@ -29,6 +29,13 @@
       "when": 1793376452015,
       "tag": "0003_dizzy_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793608341151,
+      "tag": "0004_chubby_carnage",
+      "breakpoints": true
     }
   ]
 }

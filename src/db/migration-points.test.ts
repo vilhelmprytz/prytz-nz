@@ -15,7 +15,8 @@ async function migrationsBeforePoints(): Promise<string> {
   await cp(migrationsFolder, dir, { recursive: true });
   const journalPath = path.join(dir, "meta", "_journal.json");
   const journal = JSON.parse(await readFile(journalPath, "utf8"));
-  journal.entries = journal.entries.filter((e: { tag: string }) => !e.tag.startsWith("0003_"));
+  // Everything before 0003 (Drizzle skips migrations older than the last one applied, so later ones must go too).
+  journal.entries = journal.entries.filter((e: { tag: string }) => e.tag < "0003_");
   await writeFile(journalPath, JSON.stringify(journal));
   return dir;
 }

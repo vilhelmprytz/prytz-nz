@@ -29,6 +29,7 @@ setup("seed journal content", async () => {
     const photoIds: string[] = [];
     for (let i = 0; i < opts.photos; i++) {
       const p = await createPendingPhoto(db, id, {
+        kind: "photo",
         takenAtLocal: null,
         utcOffset: null,
         lat: null,
