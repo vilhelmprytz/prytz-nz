@@ -6,6 +6,8 @@ import type { PhotoView } from "@/posts/types";
 import styles from "./feed.module.css";
 
 const SWIPE_PX = 50;
+/** A clip's own controls sit along its bottom edge: pointers there scrub, they don't swipe. */
+const CONTROLS_PX = 60;
 
 export function Lightbox({
   photos,
@@ -58,6 +60,11 @@ export function Lightbox({
       aria-label={title}
       onClick={(e) => e.target === e.currentTarget && onClose()}
       onPointerDown={(e) => {
+        const video = (e.target as Element).closest("video");
+        if (video && e.clientY > video.getBoundingClientRect().bottom - CONTROLS_PX) {
+          swipeStart.current = null;
+          return;
+        }
         swipeStart.current = e.clientX;
       }}
       onPointerUp={(e) => {
@@ -67,15 +74,33 @@ export function Lightbox({
         if (Math.abs(dx) >= SWIPE_PX) step(dx < 0 ? 1 : -1);
       }}
     >
-      <img
-        key={photo.id}
-        src={photo.displayUrl}
-        width={photo.width}
-        height={photo.height}
-        alt=""
-        className={n > 1 ? styles.lightboxImageWithStrip : styles.lightboxImage}
-        draggable={false}
-      />
+      {photo.kind === "video" ? (
+        // Keyed per item: moving to another photo unmounts it, which stops playback.
+        <video
+          key={photo.id}
+          data-testid="clip"
+          src={photo.videoUrl}
+          poster={photo.displayUrl}
+          width={photo.width}
+          height={photo.height}
+          controls
+          playsInline
+          preload="metadata"
+          className={n > 1 ? styles.lightboxVideoWithStrip : styles.lightboxVideo}
+          // Sized from the clip's own shape: before it loads, the browser would otherwise size it from the poster.
+          style={{ "--ratio": photo.width / photo.height } as React.CSSProperties}
+        />
+      ) : (
+        <img
+          key={photo.id}
+          src={photo.displayUrl}
+          width={photo.width}
+          height={photo.height}
+          alt=""
+          className={n > 1 ? styles.lightboxImageWithStrip : styles.lightboxImage}
+          draggable={false}
+        />
+      )}
       {n > 1 && (
         <>
           <button type="button" className={styles.lightboxPrev} aria-label="Previous photo" onClick={() => step(-1)}>
@@ -105,12 +130,17 @@ export function Lightbox({
             <button
               key={p.id}
               type="button"
-              aria-label={`Photo ${i + 1} of ${n}`}
+              aria-label={`${p.kind === "video" ? "Video" : "Photo"} ${i + 1} of ${n}`}
               aria-current={i === index ? "true" : undefined}
               className={i === index ? styles.miniatureCurrent : styles.miniature}
               onClick={() => onIndexChange(i)}
             >
               <img src={p.thumbUrl} alt="" loading="lazy" draggable={false} />
+              {p.kind === "video" && (
+                <span className={styles.miniaturePlay} aria-hidden="true">
+                  ▶
+                </span>
+              )}
             </button>
           ))}
         </div>

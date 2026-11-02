@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { READER_STATE } from "./env";
+import { deletePost } from "../src/posts/repo";
+import { makeClip } from "./fixtures";
 import { seedIds } from "./seed";
+import { openSeedDb, seedPost, type SeedItem } from "./seed-helpers";
 
 test.use({ storageState: READER_STATE });
 
@@ -76,4 +79,49 @@ test("a post with a single photo has no miniatures", async ({ page }) => {
   await page.goto("/");
   await page.locator(`#post-${ids.stockholm} figure`).click();
   await expect(page.getByRole("dialog").getByTestId("miniatures")).toHaveCount(0);
+});
+
+test("a clip shows ▶ and its length, plays in the big view, and stops when you move on", async ({ page }) => {
+  const ids = seedIds();
+  await page.goto(`/?post=${ids.auckland}`);
+  const tile = page.locator(`#post-${ids.auckland}`).getByRole("button", { name: "Video 3" });
+  await expect(tile).toContainText("0:02");
+  await expect(tile).toContainText("▶");
+  await tile.click();
+  const viewer = page.getByRole("dialog");
+  await expect(page.getByText("Auckland · 3 / 3")).toBeVisible();
+  const video = viewer.getByTestId("clip");
+  await expect(video).toHaveAttribute("src", /\/photos\/.+\/video$/);
+  await expect(video).toHaveAttribute("controls", "");
+  // Sized from the clip itself, not from whatever the poster or the browser guesses before loading.
+  expect((await video.boundingBox())!.width).toBeGreaterThan(300);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.muted = true;
+    return v.play();
+  });
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0.3);
+  await expect(viewer.getByTestId("miniatures").getByText("▶")).toHaveCount(1);
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByText("Auckland · 2 / 3")).toBeVisible();
+  expect(await page.evaluate(() => [...document.querySelectorAll("video")].every((v) => v.paused))).toBe(true);
+});
+
+test("a clip as the fifth tile keeps '+N', and keeps ▶ and its length in the open grid", async ({ page }) => {
+  const seed = openSeedDb();
+  const clip = await makeClip(page, { seconds: 1, width: 320, height: 180 });
+  const items: SeedItem[] = ["photo", "photo", "photo", "photo", "photo", { clip, durationMs: 1000 }, "photo", "photo"];
+  const { id } = await seedPost(seed, { title: "Clip in the grid", date: "2026-10-12", points: [{ lat: 0, lng: 0 }], items });
+  try {
+    await page.goto(`/?post=${id}`);
+    const gallery = page.locator(`#post-${id}`).getByTestId("gallery");
+    await expect(gallery.getByText("+3")).toBeVisible();
+    await page.locator(`#post-${id}`).getByRole("button", { name: "Show all 8 photos" }).click();
+    const clipTile = gallery.getByRole("button", { name: "Video 6" });
+    await expect(clipTile).toContainText("▶");
+    await expect(clipTile).toContainText("0:01");
+  } finally {
+    await deletePost(seed.db, seed.storage, id);
+    await seed.close();
+  }
 });

@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- photos come from our own gated /photos route, already resized */
 import { useState } from "react";
-import { formatPostDate } from "@/posts/format";
+import { formatDuration, formatPostDate } from "@/posts/format";
 import type { FeedPost } from "@/posts/types";
 import styles from "./feed.module.css";
 
@@ -52,6 +52,7 @@ export function PostCard({
         <div className={styles.gallery} data-testid="gallery">
           {thumbs.map((photo, i) => {
             const isMore = hidden > 0 && i === VISIBLE_THUMBS - 1;
+            const isClip = photo.kind === "video";
             return (
               <button
                 key={photo.id}
@@ -59,10 +60,16 @@ export function PostCard({
                 className={styles.thumb}
                 // "+N" opens the whole set in place; any other photo opens big.
                 onClick={() => (isMore ? setExpanded(true) : onOpenPhoto(i + 1))}
-                aria-label={isMore ? `Show all ${total} photos` : `Photo ${i + 2}`}
+                aria-label={isMore ? `Show all ${total} photos` : `${isClip ? "Video" : "Photo"} ${i + 2}`}
                 aria-expanded={isMore ? false : undefined}
               >
                 <img src={photo.thumbUrl} alt="" loading="lazy" />
+                {isClip && !isMore && (
+                  <span className={styles.clipBadge} aria-hidden="true">
+                    <span>▶</span>
+                    <span>{formatDuration(photo.durationMs ?? 0)}</span>
+                  </span>
+                )}
                 {isMore && <span className={styles.more}>+{hidden}</span>}
               </button>
             );
