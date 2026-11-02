@@ -116,3 +116,9 @@ test("diagnoseFile tells a readable file from one that can no longer be read", a
   } as unknown as Blob;
   expect(await diagnoseFile(gone)).toBe("file unreadable (NotReadableError), 4.0 MB");
 });
+
+test("clip failures say 'clip'", () => {
+  expect(describeUploadError(new DOMException("x", "EncodingError"), "compressing", undefined, "clip")).toBe(
+    "Couldn't read this clip (compressing: EncodingError: x)",
+  );
+});

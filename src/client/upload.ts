@@ -1,12 +1,25 @@
 import type { EditablePhoto } from "@/posts/types";
 import { readPhotoMeta } from "./exif";
+import {
+  checkClipLength,
+  clipTakenAtLocal,
+  compressClip,
+  ensureVideoEncoding,
+  localOffset,
+  posterFrame,
+  readClipInfo,
+  type CompressedClip,
+} from "./video";
 import { resizeImage } from "./resize";
-
 export const DISPLAY_EDGE = 2560;
 export const THUMB_EDGE = 640;
 export const QUALITY = 0.8;
+/** A clip's poster frame: a long edge of at most 1920, like the clip itself. */
+export const POSTER_EDGE = 1920;
 
-export class UploadFailedError extends Error {}
+import { UploadFailedError } from "./upload-errors";
+
+export { UploadFailedError };
 
 type RetryOptions = { attempts?: number; baseDelayMs?: number; sleep?: (ms: number) => Promise<void> };
 
@@ -31,6 +44,7 @@ export async function uploadWithRetry(put: () => Promise<Response>, opts: RetryO
 
 export type UploadStage =
   | { kind: "reading" | "resizing" | "finishing" | "done" }
+  | { kind: "compressing"; pct: number }
   | { kind: "uploading"; pct: number }
   | { kind: "failed"; message: string };
 
@@ -86,13 +100,13 @@ async function postJson<T>(url: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
-type Step = "reading" | "resizing" | "registering" | "uploading" | "finishing";
+type Step = "reading" | "resizing" | "compressing" | "registering" | "uploading" | "finishing";
 
 /** The tile's error text. Anything that isn't one of our upload errors names the step and the browser's error. */
-export function describeUploadError(error: unknown, step: Step, fileNote?: string): string {
+export function describeUploadError(error: unknown, step: Step, fileNote?: string, what: "photo" | "clip" = "photo"): string {
   if (error instanceof UploadFailedError) return error.message;
   const detail = error instanceof Error ? (error.message ? `${error.name}: ${error.message}` : error.name) : "unknown error";
-  return `Couldn't read this photo (${step}: ${detail}${fileNote ? ` — ${fileNote}` : ""})`;
+  return `Couldn't read this ${what} (${step}: ${detail}${fileNote ? ` — ${fileNote}` : ""})`;
 }
 
 const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`;
@@ -154,6 +168,92 @@ export async function uploadPhoto(file: File, postId: string, onStage: (s: Uploa
       file: { name: file.name, type: file.type, size: file.size, lastModified: file.lastModified },
     });
     onStage({ kind: "failed", message: describeUploadError(error, step, fileNote) });
+    throw error;
+  }
+}
+
+/** What a clip's upload keeps between attempts, so Retry never compresses the clip again. */
+export type KeptClip = { compressed?: CompressedClip; takenAtLocal?: string | null; utcOffset?: string | null };
+
+/**
+ * Compresses a clip on the phone (1080p H.264), takes a poster frame, then uploads the MP4 and both poster sizes
+ * with the same retries as photos. Upload links are requested only after compressing, since they expire.
+ */
+export async function uploadClip(
+  file: File,
+  postId: string,
+  offsetHint: string | null,
+  onStage: (s: UploadStage) => void,
+  kept: KeptClip = {},
+): Promise<EditablePhoto> {
+  let step: Step = "reading";
+  try {
+    if (!kept.compressed) {
+      onStage({ kind: "reading" });
+      await ensureVideoEncoding();
+      const info = await readClipInfo(file);
+      checkClipLength(info.durationMs);
+      kept.takenAtLocal = clipTakenAtLocal(info.takenAtUtc, offsetHint);
+      kept.utcOffset = kept.takenAtLocal ? (offsetHint ?? (info.takenAtUtc ? localOffset(info.takenAtUtc) : null)) : null;
+      step = "compressing";
+      onStage({ kind: "compressing", pct: 0 });
+      kept.compressed = await compressClip(file, (f) => onStage({ kind: "compressing", pct: Math.round(f * 100) }));
+    }
+    const clip = kept.compressed;
+
+    step = "compressing";
+    const still = await posterFrame(clip.blob);
+    const display = await resizeImage(still, POSTER_EDGE, QUALITY);
+    const thumb = await resizeImage(display.blob, THUMB_EDGE, QUALITY);
+
+    step = "registering";
+    const { photoId, displayPutUrl, thumbPutUrl, videoPutUrl } = await postJson<{
+      photoId: string;
+      displayPutUrl: string;
+      thumbPutUrl: string;
+      videoPutUrl: string;
+    }>("/api/admin/uploads", {
+      postId,
+      meta: {
+        kind: "video",
+        durationMs: clip.durationMs,
+        videoContentType: "video/mp4",
+        contentType: display.contentType,
+        width: clip.width,
+        height: clip.height,
+        takenAtLocal: kept.takenAtLocal ?? null,
+        utcOffset: kept.utcOffset ?? null,
+        lat: null,
+        lng: null,
+      },
+    });
+
+    // The small poster images go first: upload links expire 15 minutes after they're issued, and on a slow
+    // connection a long clip could still be uploading by then. Progress then follows the clip itself.
+    step = "uploading";
+    onStage({ kind: "uploading", pct: 0 });
+    await uploadWithRetry(() => putWithProgress(displayPutUrl, display.blob, display.contentType, () => {}));
+    await uploadWithRetry(() => putWithProgress(thumbPutUrl, thumb.blob, display.contentType, () => {}));
+    await uploadWithRetry(() =>
+      putWithProgress(videoPutUrl, clip.blob, "video/mp4", (f) => onStage({ kind: "uploading", pct: Math.round(f * 100) })),
+    );
+
+    step = "finishing";
+    onStage({ kind: "finishing" });
+    const { photo } = await postJson<{ photo: EditablePhoto }>(`/api/admin/uploads/${photoId}/complete`);
+    // Uploaded: nothing will retry it, so don't keep megabytes of video in the phone's memory.
+    kept.compressed = undefined;
+    onStage({ kind: "done" });
+    return photo;
+  } catch (error) {
+    const fileNote = step === "reading" || step === "compressing" ? await diagnoseFile(file) : undefined;
+    console.error("[upload] clip failed", {
+      step,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      fileNote,
+      file: { name: file.name, type: file.type, size: file.size },
+    });
+    onStage({ kind: "failed", message: describeUploadError(error, step, fileNote, "clip") });
     throw error;
   }
 }
