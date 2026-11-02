@@ -5,7 +5,8 @@ A private, photo-first travel journal for family and friends. Readers enter one 
 - **Next.js 16** (App Router, standalone output), one container on **Dokploy**
 - **PostgreSQL** via Drizzle (migrations run automatically on startup)
 - **Better Auth** with Google sign-in (admin, plus readers who want to react)
-- **Cloudflare R2** for photos (private bucket; every photo is served through the app)
+- **Cloudflare R2** for photos and clips (private bucket; everything is served through the app)
+- **Mediabunny** (WebCodecs) to compress clips on the phone before upload
 
 Design and plan: [`docs/superpowers/specs`](docs/superpowers/specs) and [`docs/superpowers/plans`](docs/superpowers/plans).
 
@@ -82,6 +83,7 @@ Point `prytz.nz` (an `A` record, plus `AAAA` if the server has IPv6) at the Dokp
 ### First-deploy checks
 
 - **Visitor IP:** from your phone (on mobile data, not the server's network), enter a wrong password once. The application logs should show a line like `[unlock] ip=<your phone's public IP> key=...`. If it shows a Docker or Traefik address instead, everyone would share one rate-limit bucket: adjust `TRUSTED_PROXY_HOPS` (the number of proxies in front of the app that append to `X-Forwarded-For`; `1` for plain Dokploy/Traefik) and check again.
+- **Clips on an iPhone:** open a post with a clip on an iPhone (Safari), play it and drag the scrubber. iPhones only play video from servers that answer byte-range requests, which the app does; this confirms nothing in front of it (Traefik, a CDN) strips them.
 - **Photo location on Android:** create a test post from your phone. If the Location section says `From photo GPS`, the phone keeps location data on upload. If it never does, the browser's photo picker is stripping it: use `Use my current location` while you're at the place, or drop a pin.
 
 ## Map imagery
@@ -91,5 +93,6 @@ The satellite map uses Esri's World Imagery tiles (keyless, with the required at
 ## Day-to-day
 
 - **Posting:** go to `https://prytz.nz/admin`, sign in with Google, tap **New post**, add photos. Date and location fill in from the photos; drafts autosave; **Publish** when ready. You can backfill older stops: posts are ordered by when the photos were taken.
+- **Clips:** add them with the same **Add photos** picker. Each clip (up to 2 minutes) is compressed on your phone to 1080p before it uploads, about 6 MB per 10 seconds, so keep the page open while a clip shows `Compressing`. Clips sit among the photos and play when tapped; the headline is always a photo, so a post needs at least one photo.
 - **Changing the family password:** update `FAMILY_PASSWORD` and redeploy. This signs every reader out; they enter the new password once.
 - **Unfinished uploads** (photos uploaded but never attached) are cleaned up automatically at startup after 24 hours.
