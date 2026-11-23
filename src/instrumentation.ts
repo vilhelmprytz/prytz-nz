@@ -19,7 +19,8 @@ export async function register() {
   // Catch a wrong SMTP setting at deploy time, before a post's emails are lost. Logs `[smtp] ok` or the error.
   try {
     const [{ getEnv }, { checkSmtp, createMailer }] = await Promise.all([import("./env"), import("./notify/smtp")]);
-    await checkSmtp(createMailer(getEnv()));
+    // Not awaited: an unreachable or slow SMTP server must not delay the site's start. checkSmtp never throws.
+    void checkSmtp(createMailer(getEnv()));
   } catch (error) {
     console.error("[startup] SMTP check failed", error);
   }
