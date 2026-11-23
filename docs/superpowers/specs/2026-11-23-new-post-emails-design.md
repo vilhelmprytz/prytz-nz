@@ -32,7 +32,6 @@ When Vilhelm publishes a new post, the people who have shown interest by reactin
 - Emails for anything other than a post's first publish (edits, reactions, comments).
 - A way to skip the email for one post (for example a backfilled stop).
 - Telling readers on the site that reacting puts them on the list. The email's footer says why they got it.
-- A "send me a test email" button.
 
 ## Decided by Vilhelm
 
@@ -113,6 +112,29 @@ Sluta få de här mejlen: https://prytz.nz/unsubscribe?t=<token>
   - Unknown, malformed or missing token: `Länken fungerar inte.` The same answer for every bad token.
 - **`/unsubscribe/one-click?t=<token>`**: a route handler. `POST` unsubscribes (RFC 8058 one-click, used by mail apps) and answers `200`. `GET` redirects to `/unsubscribe?t=<token>`. Unknown tokens get the same answer as known ones, so the endpoint doesn't reveal which tokens exist.
 - The token is the only authorization; the server actions on the page check it and nothing else.
+
+## Test email button (added 2026-11-23)
+
+Vilhelm asked for a way to check that sending works without emailing anyone else. Vilhelm chose a plain test message over a preview of the real new-post email.
+
+- **Where:** a `Send test email` button on `/admin`, below `New post`. The admin UI is English.
+- **What it does:** a server action checks for the admin session, then sends one email over the same `Mailer` (`createMailer`) as the new-post emails and waits for the result. Unlike new-post emails it isn't sent in the background, because showing the result is the point.
+- **Result, shown under the button:**
+  - `Sent to <ADMIN_EMAIL>. Check the inbox, and the spam folder.`
+  - `Couldn't send: <the SMTP server's error message>`
+  - `Email is off: SMTP_HOST isn't set.`
+- **The email:** from `SMTP_FROM` to `ADMIN_EMAIL`, plain text and a simple `lang="sv"` HTML version. Swedish, like the real emails, so å/ä/ö are checked too *(Claude's call)*:
+
+  ```
+  Subject: Test från prytz.nz
+
+  Hej!
+
+  Det här är ett testmejl från prytz.nz. Kommer det fram fungerar mejlinställningarna.
+  ```
+
+- **It doesn't touch** the list, unsubscribes or `announced_at`, and goes to `ADMIN_EMAIL` even if the admin has unsubscribed. A failure is also logged as `[smtp] test email failed`.
+- **README:** the first-deploy check mentions the button.
 
 ## Settings
 
