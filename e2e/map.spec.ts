@@ -13,6 +13,20 @@ test("one dot per place; clicking the oldest scrolls to it", async ({ page }) =>
   await expect(page.locator(`#post-${ids.stockholm}`)).toBeInViewport();
 });
 
+test("opens on the latest hop; Whole trip zooms out to everything", async ({ page }) => {
+  const ids = seedIds();
+  await page.goto("/");
+  const dot = (id: string) => page.locator(`.trip-dot[data-post-id="${id}"]`);
+  // Newest post (Auckland) and the place before it (Museum X, San Francisco); Stockholm is off the map.
+  await expect(dot(ids.auckland)).toBeInViewport();
+  await expect(dot(ids.museum)).toBeInViewport();
+  await expect(dot(ids.stockholm)).not.toBeInViewport();
+
+  await page.getByRole("button", { name: "Whole trip" }).click();
+  await expect(dot(ids.stockholm)).toBeInViewport();
+  await expect(dot(ids.auckland)).toBeInViewport();
+});
+
 test("scrolling to a travel day lights up all its dots", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");

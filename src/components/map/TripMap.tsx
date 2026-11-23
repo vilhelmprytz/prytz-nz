@@ -10,6 +10,8 @@ import styles from "./map.module.css";
 import { MapStyleToggle, useMapStyle } from "./MapStyleToggle";
 
 const FIT_PADDING: L.PointExpression = [50, 50];
+/** Two posts in the same town shouldn't open the map at street level. */
+const OPEN_MAX_ZOOM = 10;
 
 function dotIcon(id: string) {
   return L.divIcon({
@@ -39,6 +41,8 @@ export default function TripMap({
   const line = useRef<L.Polyline | null>(null);
   const [mapStyle, setMapStyle] = useMapStyle();
   const onSelectRef = useRef(onSelect);
+  /** Set when the map opens framed on the active post, so the first follow doesn't move it. */
+  const justOpened = useRef(false);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -51,6 +55,19 @@ export default function TripMap({
     if (latlngs.length === 0) m.setView([20, 0], 2);
     else if (latlngs.length === 1) m.setView(latlngs[0], 8);
     else m.fitBounds(L.latLngBounds(latlngs), { padding: FIT_PADDING });
+  };
+
+  /** The post's places plus the place before them: where the trip is, and where it just came from. */
+  const fitRecent = (postId: string | null) => {
+    const m = map.current;
+    if (!m) return;
+    const first = markers.current.findIndex((e) => e.postId === postId);
+    if (first === -1) return fitAll();
+    const recent = markers.current.filter((e, i) => e.postId === postId || i === first - 1);
+    m.fitBounds(L.latLngBounds(recent.map(({ marker }) => marker.getLatLng())), {
+      padding: FIT_PADDING,
+      maxZoom: OPEN_MAX_ZOOM,
+    });
   };
 
   useEffect(() => {
@@ -75,7 +92,9 @@ export default function TripMap({
         .addTo(m);
       markers.current.push({ postId: p.postId, marker });
     }
-    fitAll();
+    // Open close in on the latest hop; "Whole trip" zooms out to everything.
+    fitRecent(activeId);
+    justOpened.current = true;
 
     // The layout resizes the map (show/hide, phone rotation); Leaflet needs to be told.
     const resize = new ResizeObserver(() => m.invalidateSize());
@@ -108,9 +127,13 @@ export default function TripMap({
       marker.getElement()?.querySelector(".trip-dot")?.classList.toggle("active", postId === activeId);
       marker.closeTooltip();
     }
+    const opening = justOpened.current;
+    justOpened.current = false;
     if (active.length === 0) return;
     // One label per post, on the place where its day ended.
     active.at(-1)!.marker.openTooltip();
+    // fitRecent already framed this post; panning now could push the previous place off the map.
+    if (opening) return;
     const latlngs = active.map(({ marker }) => marker.getLatLng());
     if (latlngs.every((ll) => m.getBounds().pad(-0.15).contains(ll))) return;
     if (latlngs.length === 1) m.panTo(latlngs[0]);

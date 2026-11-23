@@ -98,6 +98,7 @@ This is Claude's call; Vilhelm hasn't seen it on a phone. The map is a strip acr
   - If Esri's terms require an API key, or don't allow this use, switch to an equivalent satellite tile provider with a free tier.
 - There is one dot per published post, at the post's location. A **solid white line** joins the dots in date order, oldest to newest.
 - Dot styling: white with an accent-coloured ring. The **active** dot is filled with the accent colour and shows a tooltip with the title and date.
+- The map opens zoomed in on the active post (the newest, or the linked one) and the place before it, so the latest hop is visible. It zooms in no closer than level 10.
 - Feed and map are linked:
   - Scrolling the feed makes the post in view the active dot. If that dot is off-screen, the map pans to it.
   - Clicking a dot scrolls the feed to that post.
