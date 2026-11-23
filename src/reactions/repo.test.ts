@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from "vitest";
 import type { Db } from "@/db/client";
-import { posts, user } from "@/db/schema";
+import { postEmailSubscribers, posts, user } from "@/db/schema";
 import { createTestDb } from "@/db/test-db";
 import { listReactions, toggleReaction } from "./repo";
 
@@ -30,4 +30,15 @@ test("draft post → Not found; unknown emoji → Bad emoji", async () => {
 
 test("listReactions with no posts → []", async () => {
   expect(await listReactions(db, [])).toEqual([]);
+});
+
+test("reacting puts the person on the email list; taking it back keeps them there", async () => {
+  await toggleReaction(db, { postId, userId, emoji: "❤️" });
+  await toggleReaction(db, { postId, userId, emoji: "❤️" });
+  expect(await db.select().from(postEmailSubscribers)).toMatchObject([{ userId, unsubscribedAt: null }]);
+});
+
+test("a rejected reaction (draft post) adds nobody", async () => {
+  await expect(toggleReaction(db, { postId: draftId, userId, emoji: "❤️" })).rejects.toThrow("Not found");
+  expect(await db.select().from(postEmailSubscribers)).toEqual([]);
 });

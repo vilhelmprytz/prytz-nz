@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { posts, reactions, user } from "@/db/schema";
+import { addSubscriber } from "@/notify/subscribers";
 import { isReaction, type Reaction } from "./emoji";
 import type { ReactionRow } from "./summary";
 
@@ -24,6 +25,8 @@ export async function toggleReaction(
     .returning({ postId: reactions.postId });
   if (removed.length > 0) return "removed";
   await db.insert(reactions).values(input).onConflictDoNothing();
+  // Reacting once is what puts someone on the new-post email list; taking it back doesn't remove them.
+  await addSubscriber(db, input.userId);
   return "added";
 }
 
