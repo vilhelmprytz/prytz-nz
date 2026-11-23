@@ -1,5 +1,5 @@
 import "server-only";
-import nodemailer, { type SMTPTransportOptions } from "nodemailer";
+import nodemailer, { type SMTPPoolOptions } from "nodemailer";
 import type { Env } from "@/env";
 
 export type OutgoingEmail = {
@@ -19,8 +19,11 @@ export type Mailer = {
   close(): void;
 };
 
-export function smtpOptions(env: Env): SMTPTransportOptions {
+export function smtpOptions(env: Env): SMTPPoolOptions & { pool: true } {
   return {
+    // One connection and one login for all of a post's emails; providers throttle repeated logins.
+    pool: true,
+    maxConnections: 1,
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURITY === "tls",

@@ -27,6 +27,10 @@ test.each([
   });
 });
 
+test("one pooled connection for all of a post's emails", () => {
+  expect(smtpOptions(withSmtp())).toMatchObject({ pool: true, maxConnections: 1 });
+});
+
 test("credentials become auth", () => {
   expect(smtpOptions(withSmtp({ SMTP_USER: "user", SMTP_PASSWORD: "pw" })).auth).toEqual({ user: "user", pass: "pw" });
 });
