@@ -8,6 +8,7 @@ import { photos, posts } from "@/db/schema";
 import { createTestDb } from "@/db/test-db";
 import { createFsStorage } from "@/storage/fs";
 import {
+  claimAnnouncement,
   cleanupStalePhotos,
   completePhoto,
   createDraft,
@@ -353,4 +354,33 @@ test("deleting a post or a stale upload removes the video object too", async () 
   await db.update(photos).set({ createdAt: new Date(NOW.getTime() - 25 * 3600_000) }).where(eq(photos.id, stale.photoId));
   expect(await cleanupStalePhotos(db, storage, NOW)).toBe(1);
   expect(await storage.head(stale.videoKey!)).toBeNull();
+});
+
+test("claim: the first claim returns the post, later ones null", async () => {
+  const id = await makePublished("Milford Sound", "2026-11-14T10:00:00", 1);
+  expect(await claimAnnouncement(db, id, NOW)).toEqual({
+    id,
+    title: "Milford Sound",
+    placeName: "Somewhere",
+    takenAtLocal: "2026-11-14T10:00:00",
+  });
+  expect(await claimAnnouncement(db, id, NOW)).toBeNull();
+});
+
+test("claim: drafts are never claimed", async () => {
+  expect(await claimAnnouncement(db, await createDraft(db), NOW)).toBeNull();
+});
+
+test("claim: unpublish then publish again doesn't claim twice", async () => {
+  const id = await makePublished("X", "2026-11-14T10:00:00", 1);
+  expect(await claimAnnouncement(db, id, NOW)).not.toBeNull();
+  await setPublished(db, id, false, NOW);
+  await setPublished(db, id, true, NOW);
+  expect(await claimAnnouncement(db, id, NOW)).toBeNull();
+});
+
+test("claim: two at once → exactly one wins", async () => {
+  const id = await makePublished("X", "2026-11-14T10:00:00", 1);
+  const results = await Promise.all([claimAnnouncement(db, id, NOW), claimAnnouncement(db, id, NOW)]);
+  expect(results.filter(Boolean)).toHaveLength(1);
 });
