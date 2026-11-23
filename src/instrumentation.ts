@@ -15,4 +15,12 @@ export async function register() {
   } catch (error) {
     console.error("[startup] upload cleanup failed", error);
   }
+
+  // Catch a wrong SMTP setting at deploy time, before a post's emails are lost. Logs `[smtp] ok` or the error.
+  try {
+    const [{ getEnv }, { checkSmtp, createMailer }] = await Promise.all([import("./env"), import("./notify/smtp")]);
+    await checkSmtp(createMailer(getEnv()));
+  } catch (error) {
+    console.error("[startup] SMTP check failed", error);
+  }
 }

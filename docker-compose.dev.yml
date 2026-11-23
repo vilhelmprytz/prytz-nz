@@ -1,4 +1,5 @@
-# Local Postgres for development and e2e tests (databases: prytz, prytz_e2e).
+# Local Postgres for development and e2e tests (databases: prytz, prytz_e2e),
+# and Mailpit, which catches outgoing email (inbox at http://localhost:8025).
 services:
   db:
     image: postgres:17-alpine
@@ -10,6 +11,11 @@ services:
     volumes:
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
       - pgdata:/var/lib/postgresql/data
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # inbox in the browser
 
 volumes:
   pgdata:

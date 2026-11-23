@@ -20,12 +20,26 @@ const schema = z
     FS_STORAGE_DIR: z.string().default(".storage"),
     TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).default(1),
     NOMINATIM_URL: z.string().default("https://nominatim.openstreetmap.org"),
+    // New-post emails. An empty SMTP_HOST turns them off.
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_SECURITY: z.enum(["starttls", "tls", "none"]).default("starttls"),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    SMTP_FROM: z.string().optional(),
     E2E_TEST_AUTH: z
       .string()
       .optional()
       .transform((v) => v === "1" || v === "true"),
   })
   .superRefine((env, ctx) => {
+    if (env.SMTP_HOST && !env.SMTP_FROM) {
+      ctx.addIssue({ code: "custom", path: ["SMTP_FROM"], message: "SMTP_FROM is required when SMTP_HOST is set" });
+    }
+    if (!env.SMTP_USER !== !env.SMTP_PASSWORD) {
+      const missing = env.SMTP_USER ? "SMTP_PASSWORD" : "SMTP_USER";
+      ctx.addIssue({ code: "custom", path: [missing], message: "Set both SMTP_USER and SMTP_PASSWORD, or neither" });
+    }
     if (env.STORAGE_DRIVER !== "s3") return;
     for (const key of S3_VARS) {
       if (!env[key]) {

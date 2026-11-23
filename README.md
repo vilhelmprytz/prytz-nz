@@ -5,6 +5,7 @@ A private, photo-first travel journal for family and friends. Readers enter one 
 - **Next.js 16** (App Router, standalone output), one container on **Dokploy**
 - **PostgreSQL** via Drizzle (migrations run automatically on startup)
 - **Better Auth** with Google sign-in (admin, plus readers who want to react)
+- **nodemailer** over SMTP for new-post emails
 - **Cloudflare R2** for photos and clips (private bucket; everything is served through the app)
 - **Mediabunny** (WebCodecs) to compress clips on the phone before upload
 
@@ -19,7 +20,7 @@ npm install
 npm run dev                                         # http://localhost:3000
 ```
 
-For local work, set `STORAGE_DRIVER=fs` in `.env.local`: photos are stored in `.storage/` and no R2 account is needed. Google sign-in works locally once the OAuth client below lists the localhost redirect URI.
+For local work, set `STORAGE_DRIVER=fs` in `.env.local`: photos are stored in `.storage/` and no R2 account is needed. To see new-post emails locally, run `docker compose -f docker-compose.dev.yml up -d mailpit`, set the Mailpit block from `.env.example`, and open the inbox at http://localhost:8025. Without `SMTP_HOST`, publishing works and no email is sent. Google sign-in works locally once the OAuth client below lists the localhost redirect URI.
 
 Tests:
 
@@ -73,6 +74,7 @@ Put the client ID and secret in `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`. Onl
    - `BETTER_AUTH_SECRET`: at least 32 random characters (`openssl rand -base64 48`)
    - `FAMILY_PASSWORD`: the password you give family and friends
    - `ADMIN_EMAIL=vilhelm@prytznet.se`
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`: see [Email](#email)
    - Never set `E2E_TEST_AUTH` in production.
 5. Deploy. Migrations run when the container starts.
 
@@ -82,9 +84,19 @@ Point `prytz.nz` (an `A` record, plus `AAAA` if the server has IPv6) at the Dokp
 
 ### First-deploy checks
 
+- **Email:** the application log should show `[smtp] ok` shortly after startup. If it shows `[smtp] check failed`, fix the SMTP settings before publishing: a post's emails go out once, when it's first published, and aren't retried. Don't publish a test post to check, since it would email everyone.
 - **Visitor IP:** from your phone (on mobile data, not the server's network), enter a wrong password once. The application logs should show a line like `[unlock] ip=<your phone's public IP> key=...`. If it shows a Docker or Traefik address instead, everyone would share one rate-limit bucket: adjust `TRUSTED_PROXY_HOPS` (the number of proxies in front of the app that append to `X-Forwarded-For`; `1` for plain Dokploy/Traefik) and check again.
 - **Clips on an iPhone:** open a post with a clip on an iPhone (Safari), play it and drag the scrubber. iPhones only play video from servers that answer byte-range requests, which the app does; this confirms nothing in front of it (Traefik, a CDN) strips them.
 - **Photo location on Android:** create a test post from your phone. If the Location section says `From photo GPS`, the phone keeps location data on upload. If it never does, the browser's photo picker is stripping it: use `Use my current location` while you're at the place, or drop a pin.
+
+## Email
+
+When you publish a post for the first time, everyone who has ever reacted to a post gets a short email in Swedish ("Nytt inlägg: …") with a link to it. You're always on the list too, so your own copy shows that sending works. There are no photos in the email, and readers without the family password go through the password page first. Unpublishing and publishing again doesn't send a second email, and posts that were already up when emails were added never send.
+
+- **Sending** happens right after Publish returns, one email per person, over regular SMTP (any provider). Failures are logged as `[notify] post <id>: …` and aren't retried.
+- **Replies** go to `ADMIN_EMAIL`. The sender is `SMTP_FROM`.
+- **Unsubscribing:** every email has a link to `/unsubscribe`, which works without the family password and can be undone. Mail apps that support one-click unsubscribe (Gmail, Apple Mail) show their own button. Reacting again doesn't resubscribe anyone.
+- **Spam folders:** set up SPF and DKIM for the domain in `SMTP_FROM` as your SMTP provider describes, or the emails are likely to land in spam.
 
 ## Map imagery
 
