@@ -3,6 +3,9 @@ import { z } from "zod";
 
 const S3_VARS = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const;
 
+// `SMTP_PORT=` in an env file means "use the default", not port 0.
+const blankAsUnset = (value: unknown) => (value === "" ? undefined : value);
+
 const schema = z
   .object({
     DATABASE_URL: z.string().min(1),
@@ -22,8 +25,8 @@ const schema = z
     NOMINATIM_URL: z.string().default("https://nominatim.openstreetmap.org"),
     // New-post emails. An empty SMTP_HOST turns them off.
     SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
-    SMTP_SECURITY: z.enum(["starttls", "tls", "none"]).default("starttls"),
+    SMTP_PORT: z.preprocess(blankAsUnset, z.coerce.number().int().min(1).max(65535).default(587)),
+    SMTP_SECURITY: z.preprocess(blankAsUnset, z.enum(["starttls", "tls", "none"]).default("starttls")),
     SMTP_USER: z.string().optional(),
     SMTP_PASSWORD: z.string().optional(),
     SMTP_FROM: z.string().optional(),

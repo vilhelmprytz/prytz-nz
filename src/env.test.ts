@@ -63,3 +63,11 @@ test("host, from and credentials parse", () => {
     SMTP_FROM: "prytz.nz <noreply@prytz.nz>",
   });
 });
+
+test("every SMTP setting left blank means emails off, and the site still starts", () => {
+  const blank = { SMTP_HOST: "", SMTP_PORT: "", SMTP_SECURITY: "", SMTP_USER: "", SMTP_PASSWORD: "", SMTP_FROM: "" };
+  const env = parseEnv({ ...base, STORAGE_DRIVER: "fs", ...blank });
+  expect(env.SMTP_HOST).toBeFalsy();
+  expect(env.SMTP_PORT).toBe(587);
+  expect(env.SMTP_SECURITY).toBe("starttls");
+});
