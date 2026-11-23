@@ -14,6 +14,9 @@ test.each([
   ["/api/feed", "reader"],
   ["/administrator", "reader"],
   ["/unlockx", "reader"],
+  ["/unsubscribe", "public"],
+  ["/unsubscribe/one-click", "public"],
+  ["/unsubscribed", "reader"],
 ])("%s → %s", (p, c) => {
   expect(classifyPath(p)).toBe(c);
 });
