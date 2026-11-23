@@ -101,7 +101,7 @@ Sluta få de här mejlen: https://prytz.nz/unsubscribe?t=<token>
 - **SMTP off:** if `SMTP_HOST` is empty, the post is still claimed, and the log says no email was sent because SMTP isn't configured. Posts published while SMTP is off are never emailed later. *(Claude's call: keeps local dev and e2e working without SMTP.)*
 - **Timeouts** on the SMTP connection so a hanging server can't hold the `after()` work forever.
 - **Startup check:** when `SMTP_HOST` is set, `src/instrumentation.ts` checks the connection and login (nodemailer's `verify()`) and logs `[smtp] ok` or the error. A failure must not stop the site. This catches a wrong setting at deploy time, before the first real post's emails are lost. *(Claude's call.)*
-- **Library:** `nodemailer` (10.6.1, no dependencies), pinned exactly like the other dependencies, with `@types/nodemailer` as a dev dependency. *(Claude's call.)*
+- **Library:** `nodemailer` (10.6.1, no dependencies, ships its own types), pinned exactly like the other dependencies. *(Claude's call.)*
 
 ## Unsubscribe page
 
@@ -133,7 +133,7 @@ Links use `BETTER_AUTH_URL`, which is already the site's public URL.
 ## Constraints
 
 - **Production data:** the migration runs on the live database. It must add the existing reactors and mark existing published posts as announced, in the same migration, so the first deploy sends nothing on its own.
-- **Shutdown:** the guarantee that pending `after()` work finishes relies on the server getting SIGTERM and time to drain. The container runs `node server.js` (standalone output); Docker gives 10 seconds by default. Losing the tail of a send during a deploy is acceptable (it's logged), but the builder should confirm the standalone server drains `after()` work on SIGTERM.
+- **Shutdown:** the guarantee that pending `after()` work finishes relies on the server getting SIGTERM and time to drain. The container runs `node server.js` (standalone output); Docker gives 10 seconds by default. Losing the tail of a send during a deploy is acceptable (it's logged). Checked while planning: the standalone server's `start-server.js` stops taking requests on SIGTERM and awaits pending `after()` work before exiting.
 - **No new paid services.** SMTP is whatever server Vilhelm already has.
 
 ## Left to the builder
