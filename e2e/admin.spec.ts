@@ -299,3 +299,9 @@ test("the location picker switches to a street map without adding a place", asyn
 
   await deleteCurrent(page);
 });
+
+test("the test email button reports that email is off", async ({ page }) => {
+  await page.goto("/admin");
+  await page.getByRole("button", { name: "Send test email" }).click();
+  await expect(page.getByRole("status")).toHaveText("Email is off: SMTP_HOST isn't set.");
+});

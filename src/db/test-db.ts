@@ -1,3 +1,6 @@
+import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -13,3 +16,16 @@ export async function createTestDb(): Promise<Db> {
   await migrate(db, { migrationsFolder });
   return db;
 }
+
+/** A temp copy of the migrations folder whose journal stops before `tagPrefix` (e.g. "0005_"). Tests only. */
+export async function migrationsBefore(tagPrefix: string): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), "pz-migrations-"));
+  await cp(migrationsFolder, dir, { recursive: true });
+  const journalPath = path.join(dir, "meta", "_journal.json");
+  const journal = JSON.parse(await readFile(journalPath, "utf8"));
+  journal.entries = journal.entries.filter((e: { tag: string }) => e.tag < tagPrefix);
+  await writeFile(journalPath, JSON.stringify(journal));
+  return dir;
+}
+
+export { migrationsFolder };

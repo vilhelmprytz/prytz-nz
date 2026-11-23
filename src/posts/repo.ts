@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, lt, max, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, max, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { photos, postPoints, posts } from "@/db/schema";
+import type { AnnouncedPost } from "@/notify/email";
 import type { Storage } from "@/storage/types";
 import { formatPostDate } from "./format";
 import type {
@@ -150,6 +151,26 @@ export async function setPublished(
     })
     .where(eq(posts.id, id));
   return { ok: true };
+}
+
+/**
+ * Marks a published post as announced, once. Only the caller that gets the post back sends the new-post email,
+ * so a double tap, a race or publishing again after unpublishing never sends twice.
+ */
+export async function claimAnnouncement(db: Db, postId: string, now: Date): Promise<AnnouncedPost | null> {
+  const [row] = await db
+    .update(posts)
+    .set({ announcedAt: now })
+    .where(
+      and(
+        eq(posts.id, postId),
+        eq(posts.status, "published"),
+        isNull(posts.announcedAt),
+        isNotNull(posts.takenAtLocal),
+      ),
+    )
+    .returning({ id: posts.id, title: posts.title, placeName: posts.placeName, takenAtLocal: posts.takenAtLocal });
+  return row ? { ...row, takenAtLocal: isoLocal(row.takenAtLocal)! } : null;
 }
 
 export async function deletePost(db: Db, storage: Storage, id: string): Promise<void> {

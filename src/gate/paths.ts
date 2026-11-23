@@ -1,7 +1,7 @@
 export type RouteClass = "public" | "self-guarded" | "reader";
 
-// Reachable without the family password.
-const PUBLIC = ["/unlock", "/api/auth", "/robots.txt"];
+// Reachable without the family password. /unsubscribe shows no journal content; its token is the only key.
+const PUBLIC = ["/unlock", "/api/auth", "/robots.txt", "/unsubscribe"];
 // Each route checks the admin session itself.
 const SELF_GUARDED = ["/admin", "/api/admin", "/api/dev-storage"];
 

@@ -105,3 +105,19 @@
   background: #e7ecfb;
   color: var(--accent);
 }
+
+.testEmail {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.testEmail p {
+  margin: 0;
+}
+
+.errorText {
+  color: #b42318;
+  font-size: 14px;
+}

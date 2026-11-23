@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdminPage } from "@/auth/viewer";
+import { TestEmailButton } from "@/components/admin/TestEmailButton";
 import { getDb } from "@/db/client";
 import { createDraftAction } from "@/posts/actions";
 import { formatPostDate } from "@/posts/format";
@@ -22,6 +23,7 @@ export default async function AdminHome() {
           New post
         </button>
       </form>
+      <TestEmailButton />
       {rows.length === 0 ? (
         <p className={styles.muted}>Nothing yet. Your first post starts with the button above.</p>
       ) : (

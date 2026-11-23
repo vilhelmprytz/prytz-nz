@@ -36,6 +36,13 @@
       "when": 1793608341151,
       "tag": "0004_chubby_carnage",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795425536460,
+      "tag": "0005_strong_the_spike",
+      "breakpoints": true
     }
   ]
 }
