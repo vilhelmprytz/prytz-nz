@@ -84,7 +84,7 @@ Point `prytz.nz` (an `A` record, plus `AAAA` if the server has IPv6) at the Dokp
 
 ### First-deploy checks
 
-- **Email:** the application log should show `[smtp] ok` shortly after startup. If it shows `[smtp] check failed`, fix the SMTP settings before publishing: a post's emails go out once, when it's first published, and aren't retried. Don't publish a test post to check, since it would email everyone.
+- **Email:** the application log should show `[smtp] ok` shortly after startup. If it shows `[smtp] check failed`, fix the SMTP settings before publishing: a post's emails go out once, when it's first published, and aren't retried. Then press **Send test email** on `/admin`: it emails only you and shows the SMTP server's answer. Don't publish a test post to check, since it would email everyone.
 - **Visitor IP:** from your phone (on mobile data, not the server's network), enter a wrong password once. The application logs should show a line like `[unlock] ip=<your phone's public IP> key=...`. If it shows a Docker or Traefik address instead, everyone would share one rate-limit bucket: adjust `TRUSTED_PROXY_HOPS` (the number of proxies in front of the app that append to `X-Forwarded-For`; `1` for plain Dokploy/Traefik) and check again.
 - **Clips on an iPhone:** open a post with a clip on an iPhone (Safari), play it and drag the scrubber. iPhones only play video from servers that answer byte-range requests, which the app does; this confirms nothing in front of it (Traefik, a CDN) strips them.
 - **Photo location on Android:** create a test post from your phone. If the Location section says `From photo GPS`, the phone keeps location data on upload. If it never does, the browser's photo picker is stripping it: use `Use my current location` while you're at the place, or drop a pin.
@@ -95,6 +95,7 @@ When you publish a post for the first time, everyone who has ever reacted to a p
 
 - **Sending** happens right after Publish returns, one email per person, over regular SMTP (any provider). Failures are logged as `[notify] post <id>: …` and aren't retried.
 - **Replies** go to `ADMIN_EMAIL`. The sender is `SMTP_FROM`.
+- **Test email:** the **Send test email** button on `/admin` sends a short Swedish test message to `ADMIN_EMAIL` and shows whether it was accepted. It doesn't touch the list.
 - **Unsubscribing:** every email has a link to `/unsubscribe`, which works without the family password and can be undone. Mail apps that support one-click unsubscribe (Gmail, Apple Mail) show their own button. Reacting again doesn't resubscribe anyone.
 - **Spam folders:** set up SPF and DKIM for the domain in `SMTP_FROM` as your SMTP provider describes, or the emails are likely to land in spam.
 
