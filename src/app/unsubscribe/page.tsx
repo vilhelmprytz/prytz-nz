@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getDb } from "@/db/client";
 import { getSubscription } from "@/notify/subscribers";
 import { parseUnsubscribeToken } from "@/notify/token";
+import { SITE_TITLE } from "@/site";
 import styles from "../unlock/unlock.module.css";
 import { setSubscriptionAction } from "./actions";
 
@@ -13,9 +14,9 @@ export default async function UnsubscribePage({ searchParams }: PageProps<"/unsu
   const subscription = token ? await getSubscription(getDb(), token) : null;
 
   return (
-    <main className={styles.page} lang="sv">
+    <main className={styles.page}>
       <div className={styles.card}>
-        <h1 className={styles.title}>prytz.nz</h1>
+        <h1 className={styles.title}>{SITE_TITLE}</h1>
         {!token || !subscription ? (
           <p className={styles.subtitle}>Länken fungerar inte.</p>
         ) : (

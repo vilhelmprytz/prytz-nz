@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/auth/auth-client";
 import { REACTIONS } from "@/reactions/emoji";
 import { toggleReactionAction } from "@/reactions/actions";
-import { formatReactors, type ReactionSummary } from "@/reactions/summary";
+import { formatReactors, YOU, type ReactionSummary } from "@/reactions/summary";
 import styles from "./feed.module.css";
 
 function toggledLocally(list: ReactionSummary[], index: number): ReactionSummary[] {
@@ -13,9 +13,9 @@ function toggledLocally(list: ReactionSummary[], index: number): ReactionSummary
   const current = list.find((r) => r.emoji === emoji);
   const next = current
     ? current.mine
-      ? { ...current, count: current.count - 1, names: current.names.filter((n) => n !== "You"), mine: false }
-      : { ...current, count: current.count + 1, names: ["You", ...current.names], mine: true }
-    : { emoji, count: 1, names: ["You"], mine: true };
+      ? { ...current, count: current.count - 1, names: current.names.filter((n) => n !== YOU), mine: false }
+      : { ...current, count: current.count + 1, names: [YOU, ...current.names], mine: true }
+    : { emoji, count: 1, names: [YOU], mine: true };
   const rest = list.filter((r) => r.emoji !== emoji);
   return REACTIONS.flatMap((e) => (e === emoji ? (next.count > 0 ? [next] : []) : rest.filter((r) => r.emoji === e)));
 }

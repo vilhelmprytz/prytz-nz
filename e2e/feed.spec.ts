@@ -10,7 +10,7 @@ test.use({ storageState: READER_STATE });
 test("newest first, drafts hidden, line breaks kept", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Vilhelm's trip" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Villes resa runt jorden" })).toBeVisible();
   await expect(page.locator("article h2")).toHaveText(["Auckland", "Museum X", "Landed!", "Leaving Stockholm"]);
   await expect(page.getByText("Secret draft")).toHaveCount(0);
   await expect(page.locator(`#post-${ids.museum}`).getByText("+3")).toBeVisible();
@@ -40,20 +40,20 @@ test("deep link scrolls to the post", async ({ page }) => {
   await expect(page.locator(`#post-${ids.stockholm}`)).toBeInViewport();
 });
 
-test("'+3' opens every photo in the post, and 'Show fewer' folds it back", async ({ page }) => {
+test("'+3' opens every photo in the post, and 'Visa färre' folds it back", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");
   const post = page.locator(`#post-${ids.museum}`);
   const gallery = post.getByTestId("gallery");
   await expect(gallery.getByRole("button")).toHaveCount(5);
-  await post.getByRole("button", { name: "Show all 8 photos" }).click();
+  await post.getByRole("button", { name: "Visa alla 8 bilder" }).click();
   await expect(gallery.getByRole("button")).toHaveCount(7);
   await expect(gallery.getByText("+3")).toHaveCount(0);
   // Opening a photo from the open grid starts at that photo.
   await gallery.getByRole("button").nth(5).click();
   await expect(page.getByText("Museum X · 7 / 8")).toBeVisible();
   await page.keyboard.press("Escape");
-  await post.getByRole("button", { name: "Show fewer" }).click();
+  await post.getByRole("button", { name: "Visa färre" }).click();
   await expect(gallery.getByRole("button")).toHaveCount(5);
 });
 
@@ -65,7 +65,7 @@ test("miniatures in the big view jump straight to a photo and follow along", asy
   const minis = viewer.getByTestId("miniatures").getByRole("button");
   await expect(minis).toHaveCount(8);
   await expect(minis.nth(0)).toHaveAttribute("aria-current", "true");
-  await viewer.getByRole("button", { name: "Photo 6 of 8" }).click();
+  await viewer.getByRole("button", { name: "Bild 6 av 8" }).click();
   await expect(page.getByText("Museum X · 6 / 8")).toBeVisible();
   await expect(minis.nth(5)).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("ArrowRight");
@@ -116,7 +116,7 @@ test("a clip as the fifth tile keeps '+N', and keeps ▶ and its length in the o
     await page.goto(`/?post=${id}`);
     const gallery = page.locator(`#post-${id}`).getByTestId("gallery");
     await expect(gallery.getByText("+3")).toBeVisible();
-    await page.locator(`#post-${id}`).getByRole("button", { name: "Show all 8 photos" }).click();
+    await page.locator(`#post-${id}`).getByRole("button", { name: "Visa alla 8 bilder" }).click();
     const clipTile = gallery.getByRole("button", { name: "Video 6" });
     await expect(clipTile).toContainText("▶");
     await expect(clipTile).toContainText("0:01");

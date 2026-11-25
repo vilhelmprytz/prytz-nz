@@ -411,7 +411,7 @@ export async function listRoutePoints(db: Db): Promise<RoutePoint[]> {
     .orderBy(asc(posts.takenAtLocal), asc(posts.createdAt), asc(posts.id), asc(postPoints.position));
   return rows.flatMap((r) =>
     r.takenAtLocal
-      ? [{ postId: r.postId, title: r.title, dateLabel: formatPostDate(isoLocal(r.takenAtLocal)!), lat: r.lat, lng: r.lng }]
+      ? [{ postId: r.postId, title: r.title, dateLabel: formatPostDate(isoLocal(r.takenAtLocal)!, "sv"), lat: r.lat, lng: r.lng }]
       : [],
   );
 }

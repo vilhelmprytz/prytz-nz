@@ -1,6 +1,6 @@
 # prytz.nz
 
-A private, photo-first travel journal for family and friends. Readers enter one shared family password; the admin posts from a phone after signing in with Google. Posts show up in a feed next to a map of the route, in satellite or street view.
+A private, photo-first travel journal for family and friends. Readers enter one shared family password; the admin posts from a phone after signing in with Google. Posts show up in a feed next to a map of the route, in satellite or street view. Readers see the site in Swedish, as *Villes resa runt jorden* (the name lives in [`src/site.ts`](src/site.ts)); the admin pages stay in English.
 
 - **Next.js 16** (App Router, standalone output), one container on **Dokploy**
 - **PostgreSQL** via Drizzle (migrations run automatically on startup)
@@ -103,7 +103,7 @@ When you publish a post for the first time, everyone who has ever reacted to a p
 
 ## Map imagery
 
-The maps use Esri's World Imagery (satellite) and World Street Map tiles, both keyless and with the required attribution, set in [`src/geo/tiles.ts`](src/geo/tiles.ts). Readers switch between them with the Satellite / Map toggle, and each browser remembers its choice; the editor's location picker has the same toggle. Esri licenses the tiles under its Master License Agreement; for a small private site this works today, but if Esri ever starts requiring a key, swap the URLs in that file for another provider with a free tier (for example MapTiler, which needs a free API key). CARTO's basemaps were considered for the street map, but they now require an API key too.
+The maps use Esri's World Imagery (satellite) and World Street Map tiles, both keyless and with the required attribution, set in [`src/geo/tiles.ts`](src/geo/tiles.ts). Readers switch between them with the Satellit / Karta toggle, and each browser remembers its choice; the editor's location picker has the same toggle, labelled Satellite / Map. Esri licenses the tiles under its Master License Agreement; for a small private site this works today, but if Esri ever starts requiring a key, swap the URLs in that file for another provider with a free tier (for example MapTiler, which needs a free API key). CARTO's basemaps were considered for the street map, but they now require an API key too.
 
 ## Day-to-day
 

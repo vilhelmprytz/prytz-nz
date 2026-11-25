@@ -103,15 +103,15 @@ export function Lightbox({
       )}
       {n > 1 && (
         <>
-          <button type="button" className={styles.lightboxPrev} aria-label="Previous photo" onClick={() => step(-1)}>
+          <button type="button" className={styles.lightboxPrev} aria-label="Föregående bild" onClick={() => step(-1)}>
             ‹
           </button>
-          <button type="button" className={styles.lightboxNext} aria-label="Next photo" onClick={() => step(1)}>
+          <button type="button" className={styles.lightboxNext} aria-label="Nästa bild" onClick={() => step(1)}>
             ›
           </button>
         </>
       )}
-      <button type="button" className={styles.lightboxClose} aria-label="Close" onClick={onClose}>
+      <button type="button" className={styles.lightboxClose} aria-label="Stäng" onClick={onClose}>
         ×
       </button>
       <div className={n > 1 ? styles.lightboxCaptionWithStrip : styles.lightboxCaption}>
@@ -130,7 +130,7 @@ export function Lightbox({
             <button
               key={p.id}
               type="button"
-              aria-label={`${p.kind === "video" ? "Video" : "Photo"} ${i + 1} of ${n}`}
+              aria-label={`${p.kind === "video" ? "Video" : "Bild"} ${i + 1} av ${n}`}
               aria-current={i === index ? "true" : undefined}
               className={i === index ? styles.miniatureCurrent : styles.miniature}
               onClick={() => onIndexChange(i)}

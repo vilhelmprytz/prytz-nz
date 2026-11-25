@@ -29,7 +29,7 @@ export function PostCard({
     <article id={`post-${post.id}`} data-post-id={post.id} className={active ? styles.postActive : styles.post}>
       <div className={styles.meta}>
         <span className={styles.dot} />
-        <span>{formatPostDate(post.takenAtLocal)}</span>
+        <span>{formatPostDate(post.takenAtLocal, "sv")}</span>
         {post.placeName && (
           <>
             <span>·</span>
@@ -60,7 +60,7 @@ export function PostCard({
                 className={styles.thumb}
                 // "+N" opens the whole set in place; any other photo opens big.
                 onClick={() => (isMore ? setExpanded(true) : onOpenPhoto(i + 1))}
-                aria-label={isMore ? `Show all ${total} photos` : `${isClip ? "Video" : "Photo"} ${i + 2}`}
+                aria-label={isMore ? `Visa alla ${total} bilder` : `${isClip ? "Video" : "Bild"} ${i + 2}`}
                 aria-expanded={isMore ? false : undefined}
               >
                 <img src={photo.thumbUrl} alt="" loading="lazy" />
@@ -78,7 +78,7 @@ export function PostCard({
       )}
       {collapsible && expanded && (
         <button type="button" className={styles.showFewer} aria-expanded onClick={() => setExpanded(false)}>
-          Show fewer
+          Visa färre
         </button>
       )}
       {children}

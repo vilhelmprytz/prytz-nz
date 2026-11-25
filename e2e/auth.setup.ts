@@ -25,8 +25,8 @@ setup("reader session with family password", async ({ browser }) => {
   });
   expect(res.ok()).toBeTruthy();
   await page.goto("/unlock");
-  await page.getByLabel("Password").fill(E2E_ENV.FAMILY_PASSWORD);
-  await page.getByRole("button", { name: "Open" }).click();
+  await page.getByLabel("Lösenord").fill(E2E_ENV.FAMILY_PASSWORD);
+  await page.getByRole("button", { name: "Öppna" }).click();
   await expect(page).toHaveURL("/");
   await context.storageState({ path: READER_STATE });
   await context.close();

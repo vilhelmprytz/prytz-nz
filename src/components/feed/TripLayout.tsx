@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { useMapHidden } from "@/components/map/use-map-hidden";
 import type { FeedItemPage, RoutePoint } from "@/posts/types";
+import { SITE_SUBTITLE, SITE_TITLE } from "@/site";
 import { Feed, type FeedHandle } from "./Feed";
 import { ReactionRow } from "./ReactionRow";
 import styles from "./feed.module.css";
@@ -51,25 +52,25 @@ export function TripLayout({
         header={
           <header className={styles.top}>
             <div>
-              <h1 className={styles.brand}>Vilhelm&apos;s trip</h1>
-              <p className={styles.subtitle}>Around the globe · 2026</p>
+              <h1 className={styles.brand}>{SITE_TITLE}</h1>
+              <p className={styles.subtitle}>{SITE_SUBTITLE}</p>
             </div>
             {!mapHidden && (
               <button type="button" className={styles.mapToggle} onClick={() => setMapHidden(true)}>
-                Hide map
+                Dölj kartan
               </button>
             )}
           </header>
         }
       />
-      <aside className={styles.mapSlot} data-testid="trip-map" aria-label="Trip map">
+      <aside className={styles.mapSlot} data-testid="trip-map" aria-label="Karta över resan">
         {!mapHidden && (
           <TripMap points={route} activeId={activeId} onSelect={selectFromMap} onHide={() => setMapHidden(true)} />
         )}
       </aside>
       {mapHidden && (
         <button type="button" className={styles.showMap} onClick={() => setMapHidden(false)}>
-          Show map
+          Visa kartan
         </button>
       )}
     </div>
