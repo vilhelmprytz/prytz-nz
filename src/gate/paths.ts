@@ -1,7 +1,8 @@
 export type RouteClass = "public" | "self-guarded" | "reader";
 
 // Reachable without the family password. /unsubscribe shows no journal content; its token is the only key.
-const PUBLIC = ["/unlock", "/api/auth", "/robots.txt", "/unsubscribe"];
+// The app icons show on the password page and in mail clients that fetch the sender's icon (/favicon.ico skips the proxy).
+const PUBLIC = ["/unlock", "/api/auth", "/robots.txt", "/unsubscribe", "/icon.svg", "/apple-icon.png"];
 // Each route checks the admin session itself.
 const SELF_GUARDED = ["/admin", "/api/admin", "/api/dev-storage"];
 
