@@ -48,3 +48,14 @@ test("an admin who unsubscribed stays unsubscribed", async () => {
   expect(await announceNewPost(db, { postId: second, adminUserId, now: NOW })).not.toBeNull();
   expect(await getSubscription(db, token)).toEqual({ subscribed: false });
 });
+
+test("publishing links an admin address typed on the list instead of adding a second row", async () => {
+  const [typed] = await db
+    .insert(postEmailSubscribers)
+    .values({ email: "admin@example.com", name: "Vilhelm", source: "admin" })
+    .returning();
+  await announceNewPost(db, { postId, adminUserId, now: NOW });
+  const rows = await db.select().from(postEmailSubscribers);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ id: typed.id, userId: adminUserId });
+});

@@ -6,6 +6,7 @@ const base = {
   siteUrl: "https://prytz.nz",
   post: { id: "p1", title: "Milford Sound", placeName: "Fiordland, New Zealand", takenAtLocal: "2026-11-14T10:00:00" },
   recipientName: "Anna Svensson",
+  source: "reaction" as const,
   unsubscribeToken: token,
 };
 
@@ -78,4 +79,13 @@ test("html escapes title, place and name and links both URLs", () => {
   expect(email.html).toContain("Sluta få de här mejlen");
   expect(email.html).toContain('lang="sv"');
   expect(email.subject).toBe(`Nytt inlägg: <b>Tom & "Jerry"</b>`);
+});
+
+test("a person the admin added gets the 'bett om' footer", () => {
+  const email = buildNewPostEmail({ ...base, source: "admin" });
+  const why = "Du får det här mejlet eftersom du har bett om att få mejl om nya inlägg på prytz.nz.";
+  expect(email.text.split("\n")).toContain(why);
+  expect(email.text).not.toContain("reagerat");
+  expect(email.html).toContain(why);
+  expect(email.html).not.toContain("reagerat");
 });

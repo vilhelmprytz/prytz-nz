@@ -128,7 +128,7 @@ export const postEmailSubscribers = pgTable(
     // Null while subscribed; also null for rows unsubscribed by older code, which shows as "themselves".
     unsubscribedBy: text("unsubscribed_by", { enum: ["self", "admin"] }),
   },
-  (t) => [check("post_email_subscribers_user_or_email", sql`"user_id" is not null or "email" is not null`)],
+  () => [check("post_email_subscribers_user_or_email", sql`"user_id" is not null or "email" is not null`)],
 );
 
 export * from "./auth-schema";

@@ -2,7 +2,7 @@ import "server-only";
 import type { Db } from "@/db/client";
 import type { Env } from "@/env";
 import { buildNewPostEmail, type AnnouncedPost } from "./email";
-import { createMailer, type Mailer } from "./smtp";
+import { createMailer, redactAddresses, type Mailer } from "./smtp";
 import { listRecipients } from "./subscribers";
 
 export type SendDeps = {
@@ -13,13 +13,6 @@ export type SendDeps = {
   replyTo: string;
   log?: Pick<Console, "info" | "error">;
 };
-
-/** SMTP errors often quote the recipient ("550 <a@b.se>: …"); log only the message, without the address. */
-function redact(error: unknown, address: string): string {
-  const message = error instanceof Error ? error.message : String(error);
-  const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return message.replace(new RegExp(escaped, "gi"), "<address>");
-}
 
 export function sendDepsFromEnv(db: Db, env: Env): SendDeps {
   return {
@@ -33,7 +26,7 @@ export function sendDepsFromEnv(db: Db, env: Env): SendDeps {
 
 /**
  * One email per person on the list, in turn, over one connection. Runs after Publish has returned:
- * it never throws, and failures go to the log (user ids, never addresses). Nothing is retried.
+ * it never throws, and failures go to the log (list row ids, never addresses). Nothing is retried.
  */
 export async function sendNewPostEmails(deps: SendDeps, post: AnnouncedPost): Promise<{ sent: number; failed: number }> {
   const { db, mailer, siteUrl, from, replyTo, log = console } = deps;
@@ -48,6 +41,7 @@ export async function sendNewPostEmails(deps: SendDeps, post: AnnouncedPost): Pr
         siteUrl,
         post,
         recipientName: recipient.name,
+        source: recipient.source,
         unsubscribeToken: recipient.unsubscribeToken,
       });
       try {
@@ -66,7 +60,12 @@ export async function sendNewPostEmails(deps: SendDeps, post: AnnouncedPost): Pr
         result.sent++;
       } catch (error) {
         result.failed++;
-        log.error("[notify] post %s: sending to user %s failed", post.id, recipient.userId, redact(error, recipient.email));
+        log.error(
+          "[notify] post %s: sending to subscriber %s failed",
+          post.id,
+          recipient.id,
+          redactAddresses(error, [recipient.email]),
+        );
       }
     }
     log.info("[notify] post %s: sent %d, failed %d", post.id, result.sent, result.failed);

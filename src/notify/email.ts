@@ -1,3 +1,5 @@
+import type { SubscriberSource } from "./subscribers";
+
 /** What a new-post email says about the post. Every published post has a title and a date. */
 export type AnnouncedPost = { id: string; title: string; placeName: string; takenAtLocal: string };
 
@@ -5,6 +7,8 @@ export type NewPostEmailInput = {
   siteUrl: string;
   post: AnnouncedPost;
   recipientName: string;
+  /** How they got on the list; decides the footer's "why". */
+  source: SubscriberSource;
   unsubscribeToken: string;
 };
 
@@ -31,11 +35,17 @@ function greeting(name: string): string {
   return first ? `Hej ${first}!` : "Hej!";
 }
 
-const escapeHtml = (s: string) =>
+export const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
 /** The short Swedish "new post, come look" email. No photos: they stay behind the family password. */
-export function buildNewPostEmail({ siteUrl, post, recipientName, unsubscribeToken }: NewPostEmailInput): NewPostEmail {
+export function buildNewPostEmail({
+  siteUrl,
+  post,
+  recipientName,
+  source,
+  unsubscribeToken,
+}: NewPostEmailInput): NewPostEmail {
   const postUrl = new URL(`/?${new URLSearchParams({ post: post.id })}`, siteUrl).toString();
   const unsubscribeQuery = new URLSearchParams({ t: unsubscribeToken });
   const unsubscribeUrl = new URL(`/unsubscribe?${unsubscribeQuery}`, siteUrl).toString();
@@ -46,7 +56,10 @@ export function buildNewPostEmail({ siteUrl, post, recipientName, unsubscribeTok
   const place = post.placeName.trim();
   const where = place ? `${place} · ${date}` : date;
   const intro = `Det finns ett nytt inlägg på ${SITE_NAME}:`;
-  const why = `Du får det här mejlet eftersom du har reagerat på ett inlägg på ${SITE_NAME}.`;
+  const why =
+    source === "admin"
+      ? `Du får det här mejlet eftersom du har bett om att få mejl om nya inlägg på ${SITE_NAME}.`
+      : `Du får det här mejlet eftersom du har reagerat på ett inlägg på ${SITE_NAME}.`;
   const stop = "Sluta få de här mejlen";
 
   const text = [
