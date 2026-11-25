@@ -14,9 +14,14 @@ export default async function AdminHome() {
     <main className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Posts</h1>
-        <Link href="/" className={styles.link}>
-          View site
-        </Link>
+        <div className={styles.headerLinks}>
+          <Link href="/admin/subscribers" className={styles.link}>
+            Subscribers
+          </Link>
+          <Link href="/" className={styles.link}>
+            View site
+          </Link>
+        </div>
       </div>
       <form action={createDraftAction}>
         <button type="submit" className={styles.button}>
