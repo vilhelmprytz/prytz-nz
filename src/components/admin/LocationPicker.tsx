@@ -151,7 +151,7 @@ export default function LocationPicker({
       {/* The toggle sits beside the map, not inside it, so tapping it never drops a pin. */}
       <div className={styles.mapFrame}>
         <div ref={container} className={styles.map} data-testid="location-map" />
-        <MapStyleToggle value={mapStyle} onChange={setMapStyle} className={styles.mapStyleToggle} />
+        <MapStyleToggle lang="en" value={mapStyle} onChange={setMapStyle} className={styles.mapStyleToggle} />
       </div>
       <p className={styles.hint}>Tap the map to add a place. For a travel day, tap each stop in order.</p>
       <button type="button" className={styles.secondaryButton} onClick={useCurrentLocation} disabled={locating}>

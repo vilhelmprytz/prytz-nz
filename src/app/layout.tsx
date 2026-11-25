@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Sans, Instrument_Serif } from "next/font/google";
+import { SITE_TITLE } from "@/site";
 import "./globals.css";
 
 const instrumentSerif = Instrument_Serif({
@@ -16,13 +17,13 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Vilhelm's trip",
+  title: SITE_TITLE,
   robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${instrumentSerif.variable} ${dmSans.variable}`}>
+    <html lang="sv" className={`${instrumentSerif.variable} ${dmSans.variable}`}>
       <body>{children}</body>
     </html>
   );

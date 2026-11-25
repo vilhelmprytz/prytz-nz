@@ -5,7 +5,7 @@ import { seedIds } from "./seed";
 test.describe("signed-in reader", () => {
   test.use({ storageState: READER_STATE });
 
-  test("toggle heart shows 'You', survives reload, toggles off", async ({ page }) => {
+  test("toggle heart shows 'Du', survives reload, toggles off", async ({ page }) => {
     const ids = seedIds();
     await page.goto("/");
     const reactions = page.locator(`#post-${ids.museum}`).getByTestId("reactions");
@@ -14,11 +14,11 @@ test.describe("signed-in reader", () => {
       page.waitForResponse((r) => r.request().method() === "POST"),
       reactions.getByRole("button", { name: "❤️" }).click(),
     ]);
-    await expect(reactions.getByText("❤️ You")).toBeVisible();
+    await expect(reactions.getByText("❤️ Du")).toBeVisible();
     await page.reload();
-    await expect(reactions.getByText("❤️ You")).toBeVisible();
+    await expect(reactions.getByText("❤️ Du")).toBeVisible();
     await reactions.getByRole("button", { name: /❤️/ }).click();
-    await expect(reactions.getByText("❤️ You")).toHaveCount(0);
+    await expect(reactions.getByText("❤️ Du")).toHaveCount(0);
   });
 });
 
@@ -28,8 +28,8 @@ test.describe("gated but signed out", () => {
   test("tapping a reaction starts Google sign-in", async ({ page }) => {
     const ids = seedIds();
     await page.goto("/unlock");
-    await page.getByLabel("Password").fill(E2E_ENV.FAMILY_PASSWORD);
-    await page.getByRole("button", { name: "Open" }).click();
+    await page.getByLabel("Lösenord").fill(E2E_ENV.FAMILY_PASSWORD);
+    await page.getByRole("button", { name: "Öppna" }).click();
     await expect(page).toHaveURL("/");
     const reactions = page.locator(`#post-${ids.museum}`).getByTestId("reactions");
     const signIn = page.waitForRequest(/\/api\/auth\/sign-in\/social/);

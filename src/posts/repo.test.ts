@@ -146,7 +146,7 @@ test("route points oldest first with date labels", async () => {
   await makePublished("B", "2026-10-21T10:00:00", 1);
   const route = await listRoutePoints(db);
   expect(route.map((r) => r.title)).toEqual(["A", "B", "C"]);
-  expect(route[0]).toEqual({ postId: a, title: "A", dateLabel: "Sun 18 Oct", lat: -36.85, lng: 174.76 });
+  expect(route[0]).toEqual({ postId: a, title: "A", dateLabel: "sön 18 okt", lat: -36.85, lng: 174.76 });
 });
 
 test("a travel day contributes every point, in order, between its neighbours", async () => {

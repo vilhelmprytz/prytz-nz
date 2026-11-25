@@ -123,7 +123,7 @@ export function Feed({
       <div className={styles.inner}>
         {header}
         {posts.length === 0 ? (
-          <p className={styles.empty}>No posts yet. Check back soon.</p>
+          <p className={styles.empty}>Inga inlägg än. Titta in snart igen.</p>
         ) : (
           posts.map((post, postIndex) => (
             <PostCard

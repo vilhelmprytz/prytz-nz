@@ -75,7 +75,7 @@ export default function TripMap({
     if (!el) return;
     const m = L.map(el, { zoomControl: false });
     map.current = m;
-    L.control.zoom({ position: "bottomright" }).addTo(m);
+    L.control.zoom({ position: "bottomright", zoomInTitle: "Zooma in", zoomOutTitle: "Zooma ut" }).addTo(m);
 
     // Unwrapped longitudes keep every hop on the short side of the globe (LA → NZ crosses the Pacific).
     const route = unwrapLongitudes(points);
@@ -92,7 +92,7 @@ export default function TripMap({
         .addTo(m);
       markers.current.push({ postId: p.postId, marker });
     }
-    // Open close in on the latest hop; "Whole trip" zooms out to everything.
+    // Open close in on the latest hop; "Hela resan" zooms out to everything.
     fitRecent(activeId);
     justOpened.current = true;
 
@@ -144,13 +144,13 @@ export default function TripMap({
   return (
     <div className={styles.wrap} data-map-style={mapStyle}>
       <div ref={container} className={styles.map} />
-      <MapStyleToggle value={mapStyle} onChange={setMapStyle} className={styles.styleToggle} />
+      <MapStyleToggle lang="sv" value={mapStyle} onChange={setMapStyle} className={styles.styleToggle} />
       <div className={styles.controls}>
         <button type="button" onClick={fitAll}>
-          Whole trip
+          Hela resan
         </button>
         <button type="button" onClick={onHide}>
-          Hide map
+          Dölj kartan
         </button>
       </div>
     </div>

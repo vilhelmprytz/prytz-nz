@@ -13,7 +13,7 @@ test("one dot per place; clicking the oldest scrolls to it", async ({ page }) =>
   await expect(page.locator(`#post-${ids.stockholm}`)).toBeInViewport();
 });
 
-test("opens on the latest hop; Whole trip zooms out to everything", async ({ page }) => {
+test("opens on the latest hop; Hela resan zooms out to everything", async ({ page }) => {
   const ids = seedIds();
   await page.goto("/");
   const dot = (id: string) => page.locator(`.trip-dot[data-post-id="${id}"]`);
@@ -22,7 +22,7 @@ test("opens on the latest hop; Whole trip zooms out to everything", async ({ pag
   await expect(dot(ids.museum)).toBeInViewport();
   await expect(dot(ids.stockholm)).not.toBeInViewport();
 
-  await page.getByRole("button", { name: "Whole trip" }).click();
+  await page.getByRole("button", { name: "Hela resan" }).click();
   await expect(dot(ids.stockholm)).toBeInViewport();
   await expect(dot(ids.auckland)).toBeInViewport();
 });
@@ -47,11 +47,11 @@ test("clicking a travel day's middle dot jumps to that post", async ({ page }) =
 
 test("hide map persists across reload", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Hide map" }).first().click();
-  await expect(page.getByRole("button", { name: "Show map" })).toBeVisible();
+  await page.getByRole("button", { name: "Dölj kartan" }).first().click();
+  await expect(page.getByRole("button", { name: "Visa kartan" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Show map" })).toBeVisible();
-  await page.getByRole("button", { name: "Show map" }).click();
+  await expect(page.getByRole("button", { name: "Visa kartan" })).toBeVisible();
+  await page.getByRole("button", { name: "Visa kartan" }).click();
   await expect(page.locator(".trip-dot")).toHaveCount(6);
 });
 
@@ -72,12 +72,12 @@ test("street map: tiles, credits and route colour switch, and the choice is reme
   const credits = map.locator(".leaflet-control-attribution");
 
   // Satellite by default.
-  await expect(map.getByRole("button", { name: "Satellite" })).toHaveAttribute("aria-pressed", "true");
+  await expect(map.getByRole("button", { name: "Satellit" })).toHaveAttribute("aria-pressed", "true");
   await expect(tiles.first()).toHaveAttribute("src", /World_Imagery/);
   await expect(route).toHaveAttribute("stroke", "#ffffff");
 
-  await map.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(map.getByRole("button", { name: "Map", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await map.getByRole("button", { name: "Karta", exact: true }).click();
+  await expect(map.getByRole("button", { name: "Karta", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(tiles.first()).toHaveAttribute("src", /World_Street_Map/);
   await expect(map.locator('img.leaflet-tile[src*="World_Imagery"]')).toHaveCount(0);
   await expect(credits).toContainText("OpenStreetMap");
@@ -86,11 +86,11 @@ test("street map: tiles, credits and route colour switch, and the choice is reme
   await expect(page.locator(".trip-dot")).toHaveCount(6);
 
   await page.reload();
-  await expect(map.getByRole("button", { name: "Map", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(map.getByRole("button", { name: "Karta", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(tiles.first()).toHaveAttribute("src", /World_Street_Map/);
   await expect(route).toHaveAttribute("stroke", "#2147d6");
 
-  await map.getByRole("button", { name: "Satellite" }).click();
+  await map.getByRole("button", { name: "Satellit" }).click();
   await expect(tiles.first()).toHaveAttribute("src", /World_Imagery/);
   await expect(credits).toContainText("Vantor");
   await expect(route).toHaveAttribute("stroke", "#ffffff");
@@ -100,7 +100,7 @@ test("phone: map credits take one line until tapped", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const map = page.getByTestId("trip-map");
-  await map.getByRole("button", { name: "Map", exact: true }).click();
+  await map.getByRole("button", { name: "Karta", exact: true }).click();
   const credits = map.locator(".leaflet-control-attribution");
   await expect(credits).toContainText("OpenStreetMap");
   const oneLine = (await credits.boundingBox())!.height;

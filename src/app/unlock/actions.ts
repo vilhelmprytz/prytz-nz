@@ -25,8 +25,8 @@ export async function unlock(_prev: UnlockState, formData: FormData): Promise<Un
   const password = String(formData.get("password") ?? "");
   const ok = timingSafeEqual(digest(password), digest(env.FAMILY_PASSWORD));
   const result = await attemptUnlock(db, key, ok, now);
-  if (result === "locked") return { error: "Too many tries. Try again in 15 minutes." };
-  if (result === "wrong") return { error: "That's not the password." };
+  if (result === "locked") return { error: "För många försök. Försök igen om 15 minuter." };
+  if (result === "wrong") return { error: "Fel lösenord." };
 
   (await cookies()).set(GATE_COOKIE, createGateToken(now.getTime(), env.FAMILY_PASSWORD, env.BETTER_AUTH_SECRET), {
     httpOnly: true,

@@ -12,7 +12,7 @@ export function UnlockForm({ next }: { next: string }) {
     <form action={action} className={styles.form}>
       <input type="hidden" name="next" value={next} />
       <label htmlFor="password" className={styles.label}>
-        Password
+        Lösenord
       </label>
       <input
         id="password"
@@ -24,7 +24,7 @@ export function UnlockForm({ next }: { next: string }) {
         className={styles.input}
       />
       <button type="submit" disabled={pending} className={styles.button}>
-        Open
+        Öppna
       </button>
       {state.error && (
         <p role="alert" className={styles.error}>
