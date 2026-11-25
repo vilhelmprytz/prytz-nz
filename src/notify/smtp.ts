@@ -38,6 +38,16 @@ export function smtpOptions(env: Env): SMTPPoolOptions & { pool: true } {
   };
 }
 
+/** SMTP errors often quote addresses ("550 <a@b.se>: …"); log only the message, with every address replaced. */
+export function redactAddresses(error: unknown, addresses: string[]): string {
+  let message = error instanceof Error ? error.message : String(error);
+  for (const address of addresses.filter(Boolean)) {
+    const escaped = address.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    message = message.replace(new RegExp(escaped, "gi"), "<address>");
+  }
+  return message;
+}
+
 /** null when SMTP_HOST is empty: emails are off. */
 export function createMailer(env: Env): Mailer | null {
   if (!env.SMTP_HOST) return null;

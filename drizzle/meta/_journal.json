@@ -43,6 +43,13 @@
       "when": 1795425536460,
       "tag": "0005_strong_the_spike",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795595732997,
+      "tag": "0006_subscriber_admin",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -100,18 +101,34 @@ export const reactions = pgTable(
   (t) => [primaryKey({ columns: [t.postId, t.userId, t.emoji] })],
 );
 
-/** Who gets new-post emails: anyone who has reacted, plus the admin. Only unsubscribing takes someone off. */
-export const postEmailSubscribers = pgTable("post_email_subscribers", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  // 64 hex characters from two random UUIDs (about 244 random bits). Never expires.
-  unsubscribeToken: text("unsubscribe_token")
-    .notNull()
-    .unique()
-    .default(sql`replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')`),
-  subscribedAt: timestamp("subscribed_at", { withTimezone: true }).notNull().defaultNow(),
-  unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
-});
+/**
+ * Who gets new-post emails: anyone who has reacted, the admin, and addresses the admin added by hand. Each row is a
+ * sign-in (`user_id`), a typed address (`email`), or both once that person signs in. Nobody is ever deleted;
+ * unsubscribing (themselves or by the admin) takes them off.
+ */
+export const postEmailSubscribers = pgTable(
+  "post_email_subscribers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Typed by the admin, trimmed and lowercased.
+    email: text("email").unique(),
+    // Typed by the admin; wins over the account's name for the greeting.
+    name: text("name").notNull().default(""),
+    source: text("source", { enum: ["reaction", "admin"] }).notNull().default("reaction"),
+    // 64 hex characters from two random UUIDs (about 244 random bits). Never expires.
+    unsubscribeToken: text("unsubscribe_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')`),
+    subscribedAt: timestamp("subscribed_at", { withTimezone: true }).notNull().defaultNow(),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    // Null while subscribed; also null for rows unsubscribed by older code, which shows as "themselves".
+    unsubscribedBy: text("unsubscribed_by", { enum: ["self", "admin"] }),
+  },
+  () => [check("post_email_subscribers_user_or_email", sql`"user_id" is not null or "email" is not null`)],
+);
 
 export * from "./auth-schema";

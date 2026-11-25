@@ -89,10 +89,11 @@ test("a failure for one recipient doesn't stop the rest, and its log has no addr
 
   expect(result).toEqual({ sent: 1, failed: 1 });
   expect(sent.map((e) => e.to.address)).toEqual(["b@example.com"]);
+  const [a] = await db.select().from(postEmailSubscribers).where(eq(postEmailSubscribers.userId, "a"));
   expect(log.error).toHaveBeenCalledWith(
-    "[notify] post %s: sending to user %s failed",
+    "[notify] post %s: sending to subscriber %s failed",
     "p1",
-    "a",
+    a.id,
     "550 mailbox unavailable",
   );
   expect(JSON.stringify(log.error.mock.calls)).not.toContain("@example.com");
@@ -129,4 +130,15 @@ test("an SMTP error that quotes the address is logged without it", async () => {
   const logged = JSON.stringify(log.error.mock.calls, (_k, v) => (v instanceof Error ? v.message : v));
   expect(logged).toContain("Recipient address rejected");
   expect(logged).not.toContain("a@example.com");
+});
+
+test("a typed address gets one email, greeted by its typed name", async () => {
+  await db.insert(postEmailSubscribers).values({ email: "mormor@example.se", name: "Mormor Anna", source: "admin" });
+  const { mailer, sent } = fakeMailer();
+  const { deps: d } = deps(mailer);
+
+  expect(await sendNewPostEmails(d, post)).toEqual({ sent: 1, failed: 0 });
+  expect(sent[0].to).toEqual({ name: "Mormor Anna", address: "mormor@example.se" });
+  expect(sent[0].text).toContain("Hej Mormor!");
+  expect(sent[0].text).toContain("eftersom du har bett om att få mejl");
 });

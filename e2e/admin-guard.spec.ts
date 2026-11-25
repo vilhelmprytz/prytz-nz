@@ -5,6 +5,8 @@ test("anonymous /admin goes to login", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL("/admin/login");
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
+  await page.goto("/admin/subscribers");
+  await expect(page).toHaveURL("/admin/login");
 });
 
 test.describe("admin", () => {
@@ -25,5 +27,7 @@ test.describe("non-admin", () => {
     await page.goto("/admin");
     await expect(page).toHaveURL("/admin/login");
     await expect(page.getByText("which can't post")).toBeVisible();
+    await page.goto("/admin/subscribers");
+    await expect(page).toHaveURL("/admin/login");
   });
 });
