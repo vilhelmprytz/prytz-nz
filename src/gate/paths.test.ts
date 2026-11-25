@@ -17,6 +17,9 @@ test.each([
   ["/unsubscribe", "public"],
   ["/unsubscribe/one-click", "public"],
   ["/unsubscribed", "reader"],
+  ["/icon.svg", "public"],
+  ["/apple-icon.png", "public"],
+  ["/icon", "reader"],
 ])("%s → %s", (p, c) => {
   expect(classifyPath(p)).toBe(c);
 });
